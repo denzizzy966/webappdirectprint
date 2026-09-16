@@ -1,0 +1,61 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 18212,
+    "cors_origins": [
+      "*"
+    ],
+    "enable_tray": true,
+    "sharing_mode": "continuous",
+    "idle_release_seconds": 4.0,
+    "pause_auto_resume_seconds": 600,
+    "enable_scale_at_startup": false
+  },
+  "printers": {
+    "default_raw_printer": "Godex G500 GZPL",
+    "default_doc_printer": "Godex G500 GZPL",
+    "default_encoding": "cp437",
+    "pools": {
+      "asset_label": "Godex G500 GZPL",
+      "label": "Godex G500 GZPL",
+      "barcode": "Godex G500 GZPL",
+      "receipt": "Godex G500 GZPL",
+      "invoice": "Microsoft Print to PDF",
+      "kitchen": "Network POS Printer (Contoh)",
+      "packing_slip": "Godex G500 GZPL"
+    },
+    "network_printers": [
+      {
+        "name": "Network POS Printer (Contoh)",
+        "ip": "192.168.1.200",
+        "port": 9100,
+        "type": "escpos"
+      }
+    ]
+  },
+  "scales": [
+    {
+      "name": "Mettler JE5002GE / Shinko",
+      "port": "COM5",
+      "usb_serial": "BMCBE14A312",
+      "protocol": "auto",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "poll_interval": 0.5,
+      "autoconnect": true
+    },
+    {
+      "name": "Simulator Timbangan",
+      "port": "SIM",
+      "protocol": "mettler",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "poll_interval": 0.5,
+      "autoconnect": false
+    }
+  ]
+}

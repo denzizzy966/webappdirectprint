@@ -1,0 +1,15 @@
+[Unit]
+Description=WebApp Hardware Bridge Universal (Direct Print & Scale Service)
+After=network.target cups.service
+
+[Service]
+Type=simple
+User=%I
+WorkingDirectory=/opt/webappdirectprint
+ExecStart=/opt/webappdirectprint/venv/bin/python3 /opt/webappdirectprint/app.py --no-tray
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

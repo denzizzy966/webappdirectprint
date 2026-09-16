@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Panduan Integrasi Hardware Bridge (Timbangan Digital & Direct Print)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --primary: #1e6fd9;
+    --primary-hover: #1758af;
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --border: #dde3e9;
+    --text: #1c2733;
+    --muted: #5a6a7a;
+    --success: #1e9e46;
+    --danger: #cd2b2b;
+  }
+  body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); line-height: 1.5; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 24px 20px 80px; }
+  h1 { font-size: 1.6rem; color: #0d253e; margin-bottom: 6px; }
+  h2 { font-size: 1.18rem; margin-top: 36px; border-bottom: 2px solid var(--border); padding-bottom: 8px; color: #16365c; }
+  h3 { font-size: 1rem; margin-top: 18px; color: #244b7a; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; margin: 14px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }
+  pre { background: #11161d; color: #cdd9e5; border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: .84rem; line-height: 1.5; }
+  code { background: #e8edf2; padding: 2px 6px; border-radius: 4px; font-size: .88em; color: #bf2600; font-family: Consolas, Monaco, 'Courier New', monospace; }
+  pre code { background: none; padding: 0; color: inherit; }
+  table { border-collapse: collapse; width: 100%; font-size: .87rem; margin: 12px 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: #f7f9fb; font-weight: 600; }
+  .demo { background: #eef8ee; border: 1.5px dashed #89ca9a; border-radius: 9px; padding: 16px 18px; margin-top: 14px; }
+  .demo-title { color: #17652c; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  button { padding: 8px 16px; border: 1px solid #c8d1da; border-radius: 7px; background: #fff; color: #222; font-weight: 500; cursor: pointer; transition: all .15s ease; }
+  button:hover { background: #f0f3f6; }
+  button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  button.primary:hover { background: var(--primary-hover); }
+  button.success { background: var(--success); border-color: var(--success); color: #fff; }
+  input[type=text], select { padding: 8px 12px; border: 1px solid #c8d1da; border-radius: 7px; font-size: .9rem; background: #fff; }
+  .muted { color: var(--muted); font-size: .86rem; }
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: .78rem; font-weight: 600; }
+  .badge-green { background: #dcfce7; color: #15803d; }
+  .badge-blue { background: #e0f2fe; color: #0369a1; }
+  .badge-amber { background: #fef3c7; color: #b45309; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 680px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>⚖️ Hardware Bridge — Panduan Integrasi Web (Laravel / ERPNext)</h1>
+<p class="muted">
+  Klien JavaScript serbaguna <b>tanpa dependensi</b> untuk membaca <b>Timbangan Digital (RS232/Serial)</b>
+  dan melakukan <b>Silent Direct Print (ESC/POS, ZPL, PDF)</b> langsung dari browser ke printer kasir/gudang via Hardware Bridge lokal (<code>http://127.0.0.1:18212</code>).
+</p>
+
+<!-- Live Indicator Status Service -->
+<div class="card" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+  <div>
+    <b>Status Hardware Bridge di PC ini:</b>
+    <span id="demo-indikator" style="margin-left: 8px; font-weight: 600;">memeriksa...</span>
+  </div>
+  <div>
+    <button onclick="HardwareBridge.listScales().then(s => alert(JSON.stringify(s, null, 2))).catch(e => alert(e.message))">
+      🔍 Cek Timbangan Aktif
+    </button>
+  </div>
+</div>
+
+<!-- SECTION 1 -->
+<h2>1. Prasyarat & Instalasi</h2>
+<div class="card">
+  <ol>
+    <li>
+      <b>Hardware Bridge berjalan di PC klien</b> (ikon system tray hijau / port <code>18212</code>).
+      <br><small class="muted">Windows: jalankan <code>HardwareBridge.exe</code> atau install service. Linux: <code>sudo systemctl start hardware-bridge</code>.</small>
+    </li>
+    <li>
+      <b>Origin HTTP di Chrome/Edge:</b> Jika aplikasi Laravel/ERPNext diakses via protokol <code>http://</code> (misal IP lokal <code>http://192.168.1.10:8000</code>), jalankan <code>allow-private-network.reg</code> sekali pada PC klien agar browser tidak memblokir koneksi ke <code>127.0.0.1</code>. Jika situs diakses lewat <code>https://</code>, bridge otomatis mendukung enkripsi WSS/HTTPS.
+    </li>
+  </ol>
+</div>
+
+<!-- SECTION 2 -->
+<h2>2. Pasang di Laravel Blade</h2>
+<div class="card">
+  <p>Salin <code>hardware-bridge.js</code> (atau <code>timbangan-service.js</code>) ke direktori <code>public/js/</code> project Laravel Anda, lalu pasang di layout Blade:</p>
+  <pre><code>&lt;!-- resources/views/layouts/app.blade.php --&gt;
+&lt;script src="{{ asset('js/hardware-bridge.js') }}"&gt;&lt;/script&gt;</code></pre>
+  <p class="muted">
+    💡 <i>Catatan:</i> Objek global <code>HardwareBridge</code> dan <code>TimbanganSvc</code> adalah <b>identik (100% kompatibel)</b>. Anda dapat memakai salah satu nama tanpa merubah kode yang sudah ada.
+  </p>
+</div>
+
+<!-- SECTION 3: PENENTUAN TIMBANGAN APABILA ADA 2 AKTIF -->
+<h2>3. Menentukan Timbangan Apabila Ada 2 (atau Lebih) yang Aktif</h2>
+<div class="card">
+  <p>
+    Di area kasir atau gudang seringkali terdapat <b>2 timbangan sekaligus</b> pada 1 PC, misalnya:
+    <br>• <b>Timbangan Gram (Presisi)</b> terhubung ke <code>COM5</code>
+    <br>• <b>Timbangan Koli / Duduk (Kapasitas Besar)</b> terhubung ke <code>COM3</code>
+  </p>
+  <p>
+    Keduanya dikonfigurasi pada file <code>bridge_config.json</code>:
+  </p>
+  <pre><code>"scales": [
+  { "name": "Timbangan Gram", "port": "COM5", "protocol": "mettler", "baud": 9600 },
+  { "name": "Timbangan Koli", "port": "COM3", "protocol": "shinko",  "baud": 9600 }
+]</code></pre>
+
+  <h3>4 Cara Menentukan Timbangan Mana yang Digunakan:</h3>
+
+  <p><b>Cara A — Parameter Langsung di Kode (Direct Parameter)</b></p>
+  <p class="muted">
+    Gunakan opsi <code>{ scale: 'Nama Timbangan' }</code> atau <code>{ scale: 'COM5' }</code>.
+    Sistem pencocokan bersifat cerdas: mencocokkan Nama Lengkap, Case-Insensitive, Nomor Port (<code>COM5</code> / <code>/dev/ttyUSB0</code>), atau Substring kata kunci (misal <code>'gram'</code> atau <code>'koli'</code>).
+  </p>
+  <pre><code>// Tombol Timbang Gram (presisi perhiasan / sparepart kecil)
+HardwareBridge.timbangKeInput('#berat_gram', { scale: 'Timbangan Gram' });
+
+// Tombol Timbang Koli (paket dus karton)
+HardwareBridge.timbangKeInput('#berat_koli', { scale: 'Timbangan Koli' });
+
+// Atau langsung menggunakan nomor port COM
+HardwareBridge.timbangKeInput('#berat', { scale: 'COM5' });</code></pre>
+
+  <p><b>Cara B — Dropdown Dinamis Pilihan Operator (Interactive Dropdown)</b></p>
+  <p class="muted">
+    Sediakan elemen <code>&lt;select id="pilihTimbangan"&gt;&lt;/select&gt;</code> di form Anda. SDK menyediakan fungsi <code>populateScaleSelect</code> untuk mengisinya secara otomatis dengan seluruh timbangan yang sedang terhubung:
+  </p>
+  <pre><code>&lt;select id="pilihTimbangan"&gt;&lt;/select&gt;
+&lt;button type="button" onclick="ambilDariPilihan()"&gt;⚖️ Timbang Sesuai Pilihan&lt;/button&gt;
+
+&lt;script&gt;
+  // Otomatis isi dropdown dengan timbangan yang sedang online:
+  HardwareBridge.populateScaleSelect('#pilihTimbangan');
+
+  function ambilDariPilihan() {
+    const scaleDipilih = document.querySelector('#pilihTimbangan').value;
+    HardwareBridge.timbangKeInput('#berat_target', {
+      scale: scaleDipilih,
+      alerts: true
+    });
+  }
+&lt;/script&gt;</code></pre>
+
+  <div class="demo">
+    <div class="demo-title">⚡ DEMO CARA B (PILIHAN DUA TIMBANGAN):</div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+      <label>Pilih Timbangan:</label>
+      <select id="demo-select-scale" style="min-width: 220px;"></select>
+      <input type="text" id="demo-input-scale" placeholder="Hasil berat..." style="width: 140px;">
+      <button class="primary" onclick="timbangDariDropdownDemo()">⚖️ Timbang</button>
+      <button onclick="HardwareBridge.populateScaleSelect('#demo-select-scale')">🔄 Refresh List</button>
+    </div>
+  </div>
+
+  <p style="margin-top: 20px;"><b>Cara C — Dialog Pop-up dengan Saklar Terintegrasi (timbangDialog)</b></p>
+  <p class="muted">
+    Fungsi <code>HardwareBridge.timbangDialog()</code> secara otomatis mendeteksi jika ada lebih dari 1 timbangan aktif, lalu menampilkan pemilih timbangan langsung di dalam modal pop-up sehingga kasir/operator dapat berganti timbangan hanya dengan 1 klik!
+  </p>
+  <pre><code>HardwareBridge.timbangDialog(function (gram, scaleObj) {
+    console.log("Diambil dari:", scaleObj.name, "Hasil:", gram);
+    document.querySelector('#berat').value = gram.toFixed(2);
+});</code></pre>
+
+  <p><b>Cara D — Otomatis (Auto Fallback)</b></p>
+  <p class="muted">
+    Jika parameter <code>scale</code> tidak diisi (atau bernilai <code>null</code>), sistem secara otomatis memilih timbangan fisik pertama yang berstatus <code>connected: true</code> (mengabaikan Simulator Virtual).
+  </p>
+</div>
+
+<!-- SECTION 4: TIMBANG KE INPUT -->
+<h2>4. <code>timbangKeInput(target, opts)</code> — Ambil Nilai STABIL</h2>
+<div class="card">
+  <p>Fungsi utama untuk memasukkan data berat yang telah <b>STABIL</b> ke dalam elemen <code>&lt;input&gt;</code>.</p>
+  <pre><code>&lt;input type="text" id="berat" name="berat"&gt;
+&lt;button type="button" onclick="HardwareBridge.timbangKeInput('#berat')"&gt;⚖️ Timbang&lt;/button&gt;
+
+// Dengan opsi lengkap:
+HardwareBridge.timbangKeInput('#berat', {
+    scale: 'Timbangan Gram', // Nama / Port timbangan (null = otomatis)
+    alerts: true,            // Tampilkan toast status progres & sukses
+    stable_timeout: 10,      // Waktu tunggu stabil maksimal (detik)
+    decimals: 2,             // Jumlah angka di belakang koma (default: 2)
+    to_gram: true            // Konversi otomatis kg/mg ke gram (default: true)
+});</code></pre>
+
+  <table>
+    <thead>
+      <tr><th>Opsi</th><th>Default</th><th>Penjelasan</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>scale</code></td><td><code>null</code> (auto)</td><td>Nama timbangan dari config atau port (misal <code>'Timbangan Gram'</code>, <code>'COM5'</code>)</td></tr>
+      <tr><td><code>alerts</code></td><td><code>false</code></td><td>Menampilkan pesan toast mengambang saat proses membaca stabil</td></tr>
+      <tr><td><code>stable_timeout</code></td><td><code>10</code></td><td>Batas maksimal menunggu timbangan stabil (dalam detik)</td></tr>
+      <tr><td><code>decimals</code></td><td><code>2</code></td><td>Presisi angka desimal hasil timbang</td></tr>
+      <tr><td><code>to_gram</code></td><td><code>true</code></td><td>Otomatis konversi satuan ke gram (kg dikali 1000, mg dibagi 1000)</td></tr>
+    </tbody>
+  </table>
+
+  <p class="muted">
+    ✅ <b>Kompatibilitas Form Reaktif:</b> Fungsi ini memicu event JavaScript standar <code>input</code> dan <code>change</code> dengan <code>bubbles: true</code>.
+    Oleh karena itu, <b>Laravel Livewire (<code>wire:model</code>)</b>, <b>Vue.js (<code>v-model</code>)</b>, dan React akan langsung ter-update tanpa perlu mengetik ulang!
+  </p>
+
+  <div class="demo">
+    <div class="demo-title">⚡ DEMO LIVE TIMBANG KE INPUT:</div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <input type="text" id="demo-berat-input" placeholder="0.00">
+      <button class="primary" onclick="HardwareBridge.timbangKeInput('#demo-berat-input', { alerts: true })">⚖️ Timbang (Stabil)</button>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 5: LIVE WEIGHT -->
+<h2>5. <code>liveWeight(target, opts)</code> — Tampilan Berat Live Real-Time</h2>
+<div class="card">
+  <p>Menampilkan angka berat yang terus diperbarui secara langsung (default interval 500ms):</p>
+  <pre><code>&lt;span id="berat-live"&gt;--&lt;/span&gt;
+
+&lt;script&gt;
+  // Menampilkan angka live real-time:
+  const stopLive = HardwareBridge.liveWeight('#berat-live', {
+    scale: 'Timbangan Gram',
+    decimals: 2,
+    suffix: ' g'
+  });
+
+  // Jika ingin menghentikan stream pembacaan:
+  // stopLive();
+&lt;/script&gt;</code></pre>
+
+  <div class="demo">
+    <div class="demo-title">⚡ DEMO LIVE STREAMING:</div>
+    <div>Berat saat ini di timbangan: <b id="demo-live-text" style="font-size: 1.4rem; color: #1e6fd9; margin-left: 8px;">--</b></div>
+  </div>
+</div>
+
+<!-- SECTION 6: DIALOG TIMBANG -->
+<h2>6. <code>timbangDialog(onUse, opts)</code> — Modal Interaktif Lengkap</h2>
+<div class="card">
+  <p>Membuka pop-up modal bersih dengan display angka besar dan tombol "Gunakan Berat (stabil)":</p>
+  <pre><code>HardwareBridge.timbangDialog(function (gram, scale) {
+    alert("Diterima dari " + scale.name + ": " + gram + " gram");
+    document.querySelector('#berat_input').value = gram.toFixed(2);
+}, {
+    title: '⚖️ Timbang Material Emas / Paket',
+    stable_timeout: 10
+});</code></pre>
+
+  <div class="demo">
+    <div class="demo-title">⚡ DEMO POP-UP DIALOG:</div>
+    <button class="success" onclick="HardwareBridge.timbangDialog((g, s) => alert('Dipilih: ' + g.toFixed(2) + ' gram dari [' + s.name + ']'))">
+      Buka Modal Timbang
+    </button>
+  </div>
+</div>
+
+<!-- SECTION 7: SILENT DIRECT PRINTING -->
+<h2>7. Silent Direct Printing (Cetak Struk ESC/POS & Faktur PDF)</h2>
+<div class="card">
+  <p>Mencetak dokumen langsung ke printer tanpa memunculkan dialog pencetakan browser:</p>
+  <pre><code>// 1. Ambil daftar printer yang terhubung ke PC
+const printerList = await HardwareBridge.getPrinters();
+console.log("Printer terpasang:", printerList.printers);
+
+// 2. Silent Print Struk Thermal Kasir (ESC/POS)
+await HardwareBridge.printRaw("EPSON TM-T82", "\x1B\x40TOKO SUKSES\nTotal: Rp 50.000\n\n\x1D\x56\x00");
+
+// 3. Silent Print Dokumen PDF (Faktur / Label Barcode)
+// Bisa berupa data Base64 maupun URL dokumen
+await HardwareBridge.printPdf("Godex G500", "data:application/pdf;base64,JVBERi0xLjQK...");
+
+// 4. Buka Cash Drawer Laci Kasir
+await HardwareBridge.openCashDrawer("EPSON TM-T82");</code></pre>
+
+  <div class="demo">
+    <div class="demo-title">⚡ DEMO DIRECT PRINT:</div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button onclick="HardwareBridge.getPrinters().then(r => alert('Daftar Printer:\n' + r.printers.join('\n')))">
+        🖨️ Lihat Daftar Printer
+      </button>
+      <button onclick="testPrintRaw()">🧾 Test Print Struk Raw</button>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 8: CONTOH FORM LARAVEL LENGKAP -->
+<h2>8. Contoh Form Lengkap: Blade + Livewire + Dua Timbangan</h2>
+<div class="card">
+  <pre><code>&lt;!-- resources/views/livewire/transaksi-penjualan.blade.php --&gt;
+&lt;div class="p-4 bg-white rounded shadow"&gt;
+    &lt;h3&gt;Form Penimbangan Barang&lt;/h3&gt;
+    
+    &lt;!-- Pilihan Dua Timbangan --&gt;
+    &lt;div class="mb-3"&gt;
+        &lt;label&gt;Pilih Timbangan Aktif:&lt;/label&gt;
+        &lt;select id="pilih-timbangan" class="form-control"&gt;&lt;/select&gt;
+    &lt;/div&gt;
+
+    &lt;!-- Input Berat dengan Livewire wire:model --&gt;
+    &lt;div class="mb-3"&gt;
+        &lt;label&gt;Berat Barang (Gram)&lt;/label&gt;
+        &lt;div class="input-group"&gt;
+            &lt;input type="text" id="input-berat" wire:model="berat_bersih" class="form-control"&gt;
+            &lt;button type="button" class="btn btn-primary" onclick="lakukanTimbang()"&gt;
+                ⚖️ Timbang Otomatis
+            &lt;/button&gt;
+        &lt;/div&gt;
+        &lt;small class="text-muted"&gt;
+            Live: &lt;b id="live-display"&gt;--&lt;/b&gt; &amp;bull; Status: &lt;span id="bridge-status"&gt;&lt;/span&gt;
+        &lt;/small&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;script src="{{ asset('js/hardware-bridge.js') }}"&gt;&lt;/script&gt;
+&lt;script&gt;
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Tampilkan status koneksi service
+    HardwareBridge.attachIndicator('#bridge-status');
+
+    // 2. Isi dropdown timbangan (Timbangan Gram / Koli)
+    HardwareBridge.populateScaleSelect('#pilih-timbangan', {
+        onChange: function (selectedScale) {
+            // Restart live reading sesuai timbangan yang dipilih
+            HardwareBridge.liveWeight('#live-display', { scale: selectedScale });
+        }
+    });
+
+    // 3. Mulai live reading default
+    HardwareBridge.liveWeight('#live-display');
+});
+
+function lakukanTimbang() {
+    const scaleName = document.querySelector('#pilih-timbangan').value;
+    HardwareBridge.timbangKeInput('#input-berat', {
+        scale: scaleName,
+        alerts: true,
+        decimals: 2
+    });
+}
+&lt;/script&gt;</code></pre>
+</div>
+
+</div>
+
+<!-- Inisialisasi Script Live Demo di Halaman ini -->
+<script src="hardware-bridge.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Hubungkan indikator status
+    HardwareBridge.attachIndicator('#demo-indikator');
+
+    // Hubungkan live reading demo
+    HardwareBridge.liveWeight('#demo-live-text');
+
+    // Isi dropdown timbangan
+    HardwareBridge.populateScaleSelect('#demo-select-scale');
+  });
+
+  function timbangDariDropdownDemo() {
+    const scale = document.querySelector('#demo-select-scale').value;
+    HardwareBridge.timbangKeInput('#demo-input-scale', {
+      scale: scale,
+      alerts: true
+    });
+  }
+
+  async function testPrintRaw() {
+    try {
+      const p = await HardwareBridge.getPrinters();
+      const printerName = p.default_raw || p.default || (p.printers && p.printers[0]);
+      if (!printerName) {
+        alert("Tidak ada printer yang terpasang pada PC ini!");
+        return;
+      }
+      const rawText = "\x1B\x40" +
+                      "================================\n" +
+                      "      TEST HARDWARE BRIDGE      \n" +
+                      "================================\n" +
+                      "Waktu : " + new Date().toLocaleString() + "\n" +
+                      "Status: BERHASIL CETAK SILENT!\n" +
+                      "================================\n\n\n\x1D\x56\x00";
+      const res = await HardwareBridge.printRaw(printerName, rawText, "Test_DirectPrint");
+      alert("Status kirim print: " + (res.status || 'success') + " ke printer [" + printerName + "]");
+    } catch (e) {
+      alert("Gagal print: " + e.message);
+    }
+  }
+</script>
+</body>
+</html>

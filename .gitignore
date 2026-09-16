@@ -1,0 +1,44 @@
+# ==============================================================================
+# Git Ignore - WebApp Hardware Bridge Universal
+# ==============================================================================
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*.class
+*.spec.bak
+
+# PyInstaller intermediate build output
+build/
+dist/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+
+# Application Logs & Debug pastes
+logs/
+*.log
+log.txt
+
+# IDE / Editor configuration
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Catatan untuk Berkas Arsip (.zip / .tar.gz):
+# File HardwareBridge_Windows_x64_Portable.zip berukuran ~66 MB.
+# GitHub merekomendasikan file di atas 50 MB di-upload via GitHub Releases.
+# Jika Anda HANYA ingin menyimpan source code di Git:
+# un-comment 2 baris di bawah:
+# *.zip
+# *.tar.gz

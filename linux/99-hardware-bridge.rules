@@ -1,0 +1,16 @@
+# Udev rules untuk WebApp Hardware Bridge (Linux Mint 22 / Ubuntu 22)
+# Mengizinkan akses serial (RS232/USB) dan direct printer tanpa hak akses root (sudo)
+
+# 1. USB-to-Serial Adapters (CH340, Prolific PL2303, FTDI, CP2102)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666", GROUP="dialout"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", MODE="0666", GROUP="dialout"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0666", GROUP="dialout"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666", GROUP="dialout"
+
+# Aturan umum untuk seluruh ttyUSB dan ttyACM
+KERNEL=="ttyUSB[0-9]*", MODE="0666", GROUP="dialout"
+KERNEL=="ttyACM[0-9]*", MODE="0666", GROUP="dialout"
+
+# 2. USB Printers (/dev/usb/lp*)
+SUBSYSTEM=="usbmisc", KERNEL=="lp[0-9]*", MODE="0666", GROUP="lp"
+KERNEL=="lp[0-9]*", MODE="0666", GROUP="lp"

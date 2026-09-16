@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebApp Hardware Bridge — Universal Direct Print & Scale Connector</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header>
+    <div class="logo-group">
+      <span class="logo-badge">⚡ BRIDGE v2.1</span>
+      <h2 style="font-size: 1.25rem;">Hardware Bridge Universal</h2>
+    </div>
+    <div class="nav-links">
+      <button class="tab-btn active" onclick="switchTab('printers')">🖨️ Direct Print</button>
+      <button class="tab-btn" onclick="switchTab('scales')">⚖️ Timbangan</button>
+      <button class="tab-btn" onclick="switchTab('serial')">🔌 Port Serial</button>
+      <button class="tab-btn" onclick="switchTab('history')">📜 Riwayat Job</button>
+      <button class="tab-btn" onclick="switchTab('settings')">⚙️ Pengaturan</button>
+      <button class="tab-btn" onclick="switchTab('docs')">📚 Panduan & SDK</button>
+      <button class="tab-btn" onclick="toggleTheme()" id="themeBtn">🌓 Tema</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Quick Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Status Service</span>
+        <div class="stat-value" id="serviceStatus">
+          <span class="badge badge-success">🟢 ONLINE</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Printer Default</span>
+        <div class="stat-value" id="statDefaultPrinter" style="font-size: 1.05rem; word-break: break-all;">Memuat...</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Berat Terkini (Live)</span>
+        <div class="stat-value" id="statWeight" style="color: var(--success);">0.00 g</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Sistem Operasi</span>
+        <div class="stat-value" id="statOs" style="font-size: 1.05rem;">Memuat...</div>
+      </div>
+    </div>
+
+    <!-- TAB 1: PRINTERS & DIRECT PRINT -->
+    <section id="tab-printers" class="tab-content">
+      <!-- Active Pools Info Badge Bar -->
+      <div class="card" style="padding: 0.85rem 1.25rem; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;" id="poolBadgeBar">
+            <span style="font-weight: 600; font-size: 0.9rem; color: var(--text-muted);">🎯 Target Label Aktif:</span>
+            <span class="badge badge-primary">Memuat...</span>
+          </div>
+          <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;" onclick="switchTab('settings')">⚙️ Kelola Label & Pool</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span>Daftar Printer Terhubung</span>
+          <button class="btn btn-secondary" onclick="loadPrinters()">🔄 Muat Ulang</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Nama Printer</th>
+              <th>Status</th>
+              <th>Driver / Tipe</th>
+              <th>Port</th>
+              <th>Aksi Pengujian</th>
+            </tr>
+          </thead>
+          <tbody id="printerTableBody">
+            <tr><td colspan="5" style="text-align: center;">Memuat daftar printer...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Sandbox Pengujian Silent Print (Direct Print)</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <!-- Left: Quick Tests -->
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Pilih Target Printer / Pool:</label>
+            <select id="targetPrinterSelect"></select>
+
+            <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Pengujian Cepat (1-Klik):</label>
+            <div class="btn-group" style="margin-bottom: 1rem;">
+              <button class="btn btn-success" onclick="testPrintReceipt()">🧾 Test Struk ESC/POS</button>
+              <button class="btn" onclick="testPrintZpl()">🏷️ Test Barcode ZPL</button>
+              <button class="btn btn-warning" onclick="testOpenDrawer()">💵 Buka Laci Kasir</button>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+              💡 <b>Direct Print (Silent Print)</b> mengirim byte langsung ke spooler printer fisik tanpa membuka dialog browser (<kbd>Ctrl+P</kbd>).
+            </p>
+          </div>
+
+          <!-- Right: Custom Payload -->
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Cetak Custom RAW / ZPL / Teks:</label>
+            <textarea id="customRawInput" placeholder="Masukkan teks, ESC/POS byte, atau kode ZPL (^XA^FO50,50^ADN,36,20^FDHalo Dunia^FS^XZ)..."></textarea>
+            <div class="btn-group">
+              <button class="btn" onclick="sendCustomRaw()">🚀 Cetak RAW Langsung</button>
+              <button class="btn btn-secondary" onclick="document.getElementById('customRawInput').value=''">Bersihkan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: TIMBANGAN DIGITAL -->
+    <section id="tab-scales" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>Monitor Timbangan Digital</span>
+          <div class="btn-group">
+            <button class="btn btn-secondary" onclick="loadScales()">🔄 Refresh</button>
+            <button class="btn btn-warning" onclick="pauseScale()">⏸️ Lepas Port (Delphi)</button>
+            <button class="btn btn-success" onclick="resumeScale()">▶️ Sambungkan</button>
+          </div>
+        </div>
+
+        <!-- Banner Opsi Nyalakan Timbangan di Startup -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 1.25rem; margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.3rem;">⚡</span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                <span>Koneksi Timbangan di Startup:</span>
+                <span id="scaleStartupBadge" class="badge badge-success">Memuat...</span>
+              </div>
+              <small style="color: var(--text-muted); font-size: 0.82rem; display: block; margin-top: 0.2rem; line-height: 1.4;">
+                💡 <b>Catatan:</b> Matikan opsi ini jika komputer atau web app masih menghubungkan timbangan langsung via JavaScript (Web Serial API browser), agar port COM tidak dikunci oleh service bridge.
+              </small>
+            </div>
+          </div>
+          <button id="toggleScaleStartupBtn" class="btn btn-secondary" onclick="toggleScaleStartup()" style="font-size: 0.82rem; padding: 0.4rem 0.85rem;">
+            Memuat...
+          </button>
+        </div>
+
+        <!-- LCD Panel -->
+        <div class="lcd-container">
+          <div>
+            <span class="lcd-weight" id="lcdWeightVal">0.00</span>
+            <span class="lcd-unit" id="lcdUnitVal">g</span>
+          </div>
+          <div class="lcd-status">
+            <span id="lcdStableBadge" class="badge badge-warning">BERGERAK (UNSTABLE)</span>
+            <span id="lcdStateBadge" class="badge badge-success">ONLINE</span>
+            <span id="lcdScaleName" style="color: var(--text-muted);">Mettler / Simulator</span>
+          </div>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="btn-group" style="justify-content: center; margin-bottom: 1.5rem;">
+          <button class="btn btn-secondary" style="font-size: 1.1rem; padding: 0.75rem 2rem;" onclick="sendZero()">0️⃣ ZERO</button>
+          <button class="btn btn-secondary" style="font-size: 1.1rem; padding: 0.75rem 2rem;" onclick="sendTare()">⚖️ TARE</button>
+          <button class="btn btn-success" style="font-size: 1.1rem; padding: 0.75rem 2rem;" onclick="readStableWeight()">🔒 Ambil Berat Stabil</button>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Nama Timbangan</th>
+              <th>Port</th>
+              <th>Protokol</th>
+              <th>Status</th>
+              <th>Koneksi</th>
+              <th>Berat Saat Ini</th>
+            </tr>
+          </thead>
+          <tbody id="scaleTableBody">
+            <tr><td colspan="6" style="text-align: center;">Memuat status timbangan...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: SERIAL PORTS -->
+    <section id="tab-serial" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>Port Serial Fisik di Komputer</span>
+          <button class="btn btn-secondary" onclick="loadSerialPorts()">🔄 Pindai Port (Scan)</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Port Device</th>
+              <th>Deskripsi / Hardware ID</th>
+              <th>Pabrikan (Chipset)</th>
+              <th>VID : PID</th>
+            </tr>
+          </thead>
+          <tbody id="serialTableBody">
+            <tr><td colspan="4" style="text-align: center;">Memuat port serial...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 4: JOB HISTORY -->
+    <section id="tab-history" class="tab-content" style="display: none;">
+      <div class="card">
+        <div class="card-title">
+          <span>Riwayat Eksekusi Job Cetak</span>
+          <button class="btn btn-secondary" onclick="loadPrintHistory()">🔄 Refresh Log</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tipe</th>
+              <th>Printer</th>
+              <th>Waktu</th>
+              <th>Ukuran</th>
+              <th>Status</th>
+              <th>Keterangan</th>
+            </tr>
+          </thead>
+          <tbody id="historyTableBody">
+            <tr><td colspan="7" style="text-align: center;">Belum ada riwayat job.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 5: SETTINGS -->
+    <section id="tab-settings" class="tab-content" style="display: none;">
+      <!-- Card 1: Printer Pool & Target Alias Mapping -->
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 Pemetaan Printer Pool & Label Target (imTigger Compatible)</span>
+          <button class="btn btn-secondary" onclick="loadPrinterPools()">🔄 Muat Ulang</button>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.25rem; line-height: 1.5;">
+          Petakan alias target (misal: <code>asset_label</code>, <code>receipt</code>, <code>label</code>, <code>invoice</code>, <code>barcode</code>) ke printer fisik terpasang di komputer ini. Web app atau ERPNext cukup mengirim nama target ini tanpa perlu tahu nama printer fisik klien.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 25%;">Label / Target Pool</th>
+              <th>Printer Fisik Dituju</th>
+              <th style="width: 120px; text-align: center;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="poolTableBody">
+            <tr><td colspan="3" style="text-align: center;">Memuat konfigurasi printer pool...</td></tr>
+          </tbody>
+        </table>
+
+        <!-- Form Tambah Mapping -->
+        <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-secondary); border: 1px dashed var(--border); border-radius: 8px;">
+          <h4 style="margin-bottom: 0.75rem; font-size: 0.95rem;">➕ Tambah Mapping Label Baru</h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: flex-end;">
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Nama Label / Target:</label>
+              <input type="text" id="newPoolKey" placeholder="Contoh: shipping_label, kitchen, pos_cashier">
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Pilih Printer Fisik:</label>
+              <select id="newPoolPrinter"></select>
+            </div>
+            <div>
+              <button class="btn btn-primary" onclick="addPoolMapping()">➕ Tambah</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Default Printer Selectors -->
+        <div style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Default RAW Printer (ESC/POS, ZPL, Barcode):</label>
+            <select id="cfgDefaultRawPrinter"></select>
+          </div>
+          <div>
+            <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Default Doc / PDF Printer (A4, Invoice, Dokumen):</label>
+            <select id="cfgDefaultDocPrinter"></select>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.25rem;">
+          <button class="btn btn-success" onclick="savePrinterPools()">💾 Simpan Konfigurasi Printer Pool</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Server Config -->
+      <div class="card">
+        <div class="card-title">Konfigurasi Hardware Bridge Universal</div>
+        <div style="max-width: 600px;">
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Host Pengikat:</label>
+          <input type="text" id="cfgHost" value="127.0.0.1">
+
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Port Service (WebSocket & HTTP):</label>
+          <input type="number" id="cfgPort" value="18212">
+
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Mode Port Sharing Timbangan:</label>
+          <select id="cfgSharingMode">
+            <option value="continuous">Continuous (Streaming cepat, auto-resume)</option>
+            <option value="on_demand">On-Demand (Lepas port otomatis saat idle untuk Delphi/Browser)</option>
+          </select>
+
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Idle Release Timeout (Detik):</label>
+          <input type="number" id="cfgIdleRelease" value="4.0" step="0.5">
+
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Nyalakan Timbangan di Startup:</label>
+          <select id="cfgScaleStartup">
+            <option value="true">Aktif (Otomatis sambung ke timbangan saat startup)</option>
+            <option value="false">Nonaktif (Jangan sambung otomatis — Port COM bebas untuk Web Serial JS browser)</option>
+          </select>
+          <small style="display: block; color: var(--text-muted); margin-top: -0.2rem; margin-bottom: 1rem; font-size: 0.82rem; line-height: 1.4;">
+            💡 Pilih <b>Nonaktif</b> jika komputer ini masih memakai app atau halaman web yang membaca timbangan via JavaScript langsung (Chrome Web Serial API), sehingga port COM tidak bentrok atau terkunci oleh service bridge.
+          </small>
+
+          <button class="btn btn-success" onclick="saveSettings()">💾 Simpan Konfigurasi Server</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 6: DOKUMENTASI & DOWNLOAD SDK -->
+    <section id="tab-docs" class="tab-content" style="display: none;">
+      <!-- Download Cards Grid -->
+      <div class="card">
+        <div class="card-title">
+          <span>📦 Download Client SDK & Script Integrasi</span>
+          <a href="/api/download/all-scripts.zip" class="btn btn-warning" style="text-decoration: none;">📦 Download Semua (.ZIP)</a>
+        </div>
+        <p style="color: var(--text-muted); margin-bottom: 1.25rem;">
+          Unduh library JavaScript dan script integrasi untuk dipasang di aplikasi web, sistem kasir (POS), atau ERPNext Anda.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+          <!-- Card 1: Universal SDK -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <b style="font-size: 1.05rem;">🌐 Universal SDK (JS)</b>
+                <span class="badge badge-primary">v2.1.0</span>
+              </div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <code>hardware-bridge.js</code><br>
+                SDK JavaScript universal untuk semua web app, HTML, React, Vue, PHP, dsb. Mendukung WebSocket & REST fallback.
+              </p>
+            </div>
+            <div class="btn-group">
+              <a href="/api/download/hardware-bridge.js" class="btn" style="text-decoration: none; flex: 1; justify-content: center;">⬇️ Download .js</a>
+              <button class="btn btn-secondary" onclick="copySdkUrl()">📋 Salin URL</button>
+            </div>
+          </div>
+
+          <!-- Card 2: ERPNext Client Script -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <b style="font-size: 1.05rem;">⚡ ERPNext Client Script</b>
+                <span class="badge badge-success">Frappe v13/14/15</span>
+              </div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <code>erpnext_hardware_bridge.js</code><br>
+                Tambahkan tombol "Cetak Struk", "Buka Laci", dan "Timbang Item" langsung di form POS / Sales Invoice ERPNext.
+              </p>
+            </div>
+            <div class="btn-group">
+              <a href="/api/download/erpnext-client-script.js" class="btn" style="text-decoration: none; flex: 1; justify-content: center;">⬇️ Download .js</a>
+              <button class="btn btn-secondary" onclick="copyCodeSnippet('snippet-erpnext')">📋 Salin Kode</button>
+            </div>
+          </div>
+
+          <!-- Card 3: POS Auto-Print Hook -->
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+                <b style="font-size: 1.05rem;">🛒 ERPNext POS Auto-Print</b>
+                <span class="badge badge-warning">POS Awesome / Standard</span>
+              </div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                <code>erpnext_pos_direct_print.js</code><br>
+                Hook event saat kasir klik Bayar (Submit): otomatis cetak struk tanpa dialog dan buka laci kasir.
+              </p>
+            </div>
+            <div class="btn-group">
+              <a href="/api/download/erpnext-pos-script.js" class="btn" style="text-decoration: none; flex: 1; justify-content: center;">⬇️ Download .js</a>
+              <button class="btn btn-secondary" onclick="copyCodeSnippet('snippet-pos')">📋 Salin Kode</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panduan Interaktif Penggunaan & Kode Contoh -->
+      <div class="card">
+        <div class="card-title">📖 Panduan Penggunaan & Contoh Kode</div>
+
+        <!-- Section A: Web Biasa -->
+        <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--primary);">1. Penggunaan di Web Biasa (HTML / Vanilla JS / React / Vue)</h4>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Cukup panggil tag <code>&lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;</code> di HTML Anda:
+        </p>
+        <div style="position: relative;">
+          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem;" id="snippet-web"><code>&lt;!-- 1. Muat SDK dari Bridge Server Lokal --&gt;
+&lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;
+
+&lt;script&gt;
+async function initBridge() {
+  const bridge = new HardwareBridge({ port: 18212 });
+  await bridge.connect();
+
+  // A. Ambil daftar printer yang terdeteksi
+  const printerList = await bridge.getPrinters();
+  console.log("Printer terdeteksi:", printerList.printers);
+
+  // B. Silent Print Struk Thermal (ESC/POS)
+  const rawReceipt = "\x1b\x40\x1b\x61\x01TOKO KITA\n----------------\n1x Kopi   Rp 25.000\n----------------\n\n\x1dV\x42\x00";
+  await bridge.printRaw("EPSON TM-T82", rawReceipt);
+
+  // C. Silent Print PDF (Faktur / Invoice)
+  await bridge.printPdf("Printer Kantor", "http://127.0.0.1:8088/api/invoice/INV-001.pdf");
+
+  // D. Baca Bobot Timbangan Digital (Real-Time)
+  const result = await bridge.getWeight();
+  console.log("Berat saat ini:", result.weight, result.unit, "Stabil:", result.stable);
+
+  // E. Buka Laci Kasir (Cash Drawer Kick)
+  await bridge.openCashDrawer();
+
+  // F. Dengarkan stream perubahan berat secara reactive
+  bridge.onWeightChange((scales) => {
+    const scale = scales[0];
+    document.getElementById("tampilan-berat").innerText = `${scale.weight} ${scale.unit}`;
+  });
+}
+initBridge();
+&lt;/script&gt;</code></pre>
+          <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-web')">📋 Salin</button>
+        </div>
+
+        <!-- Section B: ERPNext Client Script -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">2. Cara Pasang di ERPNext (Client Script)</h4>
+        <ol style="margin-left: 1.5rem; font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.6;">
+          <li>Buka Desk ERPNext Anda (sebagai Administrator / System Manager).</li>
+          <li>Di Search Bar atas, ketik <b>Client Script</b> lalu tekan Enter.</li>
+          <li>Klik <b>+ Add Client Script</b>.</li>
+          <li>Set <b>DocType</b> ke <code>POS Invoice</code> atau <code>Sales Invoice</code>.</li>
+          <li>Set <b>Apply To</b> ke <code>Form</code> dan centang <b>Enabled</b>.</li>
+          <li>Salin kode berikut ke kolom <b>Script</b> dan klik <b>Save</b>:</li>
+        </ol>
+        <div style="position: relative;">
+          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; max-height: 350px;" id="snippet-erpnext"><code>frappe.ui.form.on('POS Invoice', {
+    refresh: function(frm) {
+        if (!frm.is_new()) {
+            // Tombol Direct Print Struk
+            frm.add_custom_button(__('🖨️ Cetak Struk (Direct Print)'), function() {
+                frappe.show_alert({ message: __('Mengirim ke printer kasir...'), indicator: 'blue' });
+
+                // Format ESC/POS
+                let receipt = "\x1b\x40\x1b\x61\x01\x1d\x21\x11" + (frm.doc.company || 'STRUK KASIR') + "\n\x1d\x21\x00";
+                receipt += "----------------------------------------\n\x1b\x61\x00";
+                receipt += "No Inv : " + frm.doc.name + "\n";
+                receipt += "Waktu  : " + frm.doc.posting_date + "\n========================================\n";
+
+                (frm.doc.items || []).forEach(item => {
+                    receipt += `${item.qty}x ${item.item_name} - ${format_currency(item.amount, frm.doc.currency)}\n`;
+                });
+
+                receipt += "----------------------------------------\n\x1b\x61\x02";
+                receipt += "TOTAL: " + format_currency(frm.doc.grand_total, frm.doc.currency) + "\n\x1b\x61\x01";
+                receipt += "Terima Kasih!\n\n\n\x1d\x56\x42\x00";
+
+                // Kirim ke Bridge lokal di PC Kasir
+                fetch('http://127.0.0.1:18212/api/print/raw', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: receipt, doc_name: frm.doc.name })
+                })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'success') frappe.show_alert({ message: __('Struk berhasil dicetak!'), indicator: 'green' });
+                    else frappe.msgprint(__('Gagal mencetak: ' + res.detail));
+                })
+                .catch(() => frappe.msgprint(__('Hardware Bridge tidak aktif di http://127.0.0.1:18212')));
+            }, __('Aksi Cepat'));
+
+            // Tombol Buka Laci Kasir
+            frm.add_custom_button(__('💵 Buka Laci Kasir'), function() {
+                fetch('http://127.0.0.1:18212/api/cashdrawer/open', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: 2 })
+                }).then(() => frappe.show_alert({ message: __('Laci kasir terbuka!'), indicator: 'green' }));
+            }, __('Aksi Cepat'));
+        }
+
+        // Tombol Baca Timbangan
+        frm.add_custom_button(__('⚖️ Timbang Item Aktif'), function() {
+            frappe.show_alert({ message: __('Menimbang... Harap tunggu stabil'), indicator: 'blue' });
+            fetch('http://127.0.0.1:18212/api/scale/stable-read?timeout=4.0', { method: 'POST' })
+                .then(r => r.json())
+                .then(res => {
+                    if (res.status === 'success') {
+                        frappe.msgprint({
+                            title: __('Hasil Timbangan'),
+                            indicator: 'green',
+                            message: `Berat: <b>${res.data.weight} ${res.data.unit}</b> (Stabil)`
+                        });
+                    } else {
+                        frappe.msgprint(__('Timbangan belum stabil: ' + res.message));
+                    }
+                });
+        }, __('Aksi Cepat'));
+    }
+});</code></pre>
+          <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-erpnext')">📋 Salin</button>
+        </div>
+
+        <!-- Section C: POS Auto-Print Hook -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">3. Hook POS Checkout Otomatis (POS Awesome & ERPNext POS)</h4>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Script ini mendengarkan event submit POS invoice untuk langsung mencetak struk dan menendang laci uang saat kasir selesai memproses pembayaran:
+        </p>
+        <div style="position: relative;">
+          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; max-height: 250px;" id="snippet-pos"><code>$(document).on('pos_invoice_submitted', function(event, invoice_doc) {
+    if (!invoice_doc) return;
+
+    // 1. Buka laci kasir otomatis
+    fetch('http://127.0.0.1:18212/api/cashdrawer/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: 2 })
+    }).catch(() => {});
+
+    // 2. Format Struk Thermal ESC/POS
+    let receipt = "\x1b\x40\x1b\x61\x01\x1d\x21\x11" + (invoice_doc.company || "STRUK KASIR") + "\n\x1d\x21\x00";
+    receipt += "----------------------------------------\n\x1b\x61\x00";
+    receipt += "No: " + invoice_doc.name + "\n";
+    receipt += "Tgl: " + invoice_doc.posting_date + "\nKasir: " + (invoice_doc.owner || "") + "\n----------------------------------------\n";
+
+    (invoice_doc.items || []).forEach(item => {
+        receipt += `${item.qty}x ${item.item_name} - ${Number(item.amount).toLocaleString('id-ID')}\n`;
+    });
+
+    receipt += "----------------------------------------\n\x1b\x61\x02";
+    receipt += "TOTAL: Rp " + Number(invoice_doc.grand_total).toLocaleString('id-ID') + "\n";
+    receipt += "----------------------------------------\n\x1b\x61\x01";
+    receipt += "Terima Kasih!\n\n\n\x1d\x56\x42\x00";
+
+    // 3. Kirim ke Bridge lokal di PC Kasir
+    fetch('http://127.0.0.1:18212/api/print/raw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: receipt, doc_name: invoice_doc.name })
+    }).catch(err => console.warn('Gagal print POS:', err));
+});</code></pre>
+          <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-pos')">📋 Salin</button>
+        </div>
+
+        <!-- Section D: REST API & cURL -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">4. Penggunaan via REST API (cURL / Backend Python / PHP / C#)</h4>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Anda juga dapat memanggil bridge dari script command line, backend lokal, atau desktop app:
+        </p>
+        <div style="position: relative;">
+          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem;" id="snippet-curl"><code># 1. Ambil daftar printer
+curl -X GET http://127.0.0.1:18212/api/printers
+
+# 2. Cetak RAW teks / ESC/POS
+curl -X POST http://127.0.0.1:18212/api/print/raw \
+  -H "Content-Type: application/json" \
+  -d '{"printer": "Godex G500 GZPL", "data": "Halo Dunia Kasir!\n\n\n"}'
+
+# 3. Cetak PDF Silent
+curl -X POST http://127.0.0.1:18212/api/print/pdf \
+  -H "Content-Type: application/json" \
+  -d '{"pdf_data": "http://127.0.0.1:8088/api/invoice/INV-001.pdf"}'
+
+# 4. Ambil Berat Timbangan
+curl -X GET http://127.0.0.1:18212/api/weight
+
+# 5. Buka Laci Kasir
+curl -X POST http://127.0.0.1:18212/api/cashdrawer/open -H "Content-Type: application/json" -d '{"pin": 2}'</code></pre>
+          <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-curl')">📋 Salin</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live Console Output -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-title">
+        <span>Monitor Log & Event Stream</span>
+        <button class="btn btn-secondary" onclick="clearLogs()" style="padding: 0.3rem 0.7rem; font-size: 0.8rem;">Bersihkan Log</button>
+      </div>
+      <div class="log-box" id="logBox">
+        <div class="log-entry"><span class="time">[INIT]</span> Menghubungkan ke Hardware Bridge Daemon...</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    WebApp Hardware Bridge &copy; 2026. Mendukung Windows 10/11 & Linux Mint 22 / Ubuntu 22. Siap integrasi dengan ERPNext, Frappe, & Web POS.
+  </footer>
+
+  <script src="/static/js/hardware-bridge.js?v=1.0.2"></script>
+  <script src="/static/js/app.js?v=1.0.2"></script>
+</body>
+</html>
