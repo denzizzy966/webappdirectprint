@@ -27,7 +27,7 @@ function switchTab(tabId) {
     if (activeBtn) activeBtn.classList.add('active');
 
     if (tabId === 'printers') loadPrinters();
-    if (tabId === 'scales') { loadScales(); loadControlPorts(); pollScaleTerminal(); }
+    if (tabId === 'scales') { loadScales(); loadControlPorts(); pollScaleTerminal(); renderTerminalLogs(); }
     if (tabId === 'serial') loadSerialPorts();
     if (tabId === 'history') loadPrintHistory();
     if (tabId === 'settings') { loadSettings(); loadPrinterPools(); }
@@ -563,10 +563,10 @@ function selectScalePort(port) {
     }
     onSelectedPortChange();
 
-    // Scroll ke atas dengan halus menuju LCD konsol
-    const topBar = document.getElementById('ctrlPort');
+    // Scroll jika konsol berada di luar viewport
+    const topBar = document.getElementById('lcdScaleTitle');
     if (topBar) {
-        topBar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        topBar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
@@ -587,9 +587,9 @@ function onProtocolPresetChange() {
     const grpShinko = document.getElementById('cmds-shinko');
     const grpAnd = document.getElementById('cmds-and');
 
-    if (grpMettler) grpMettler.style.display = (proto === 'mettler' || proto === 'auto') ? 'flex' : 'none';
-    if (grpShinko) grpShinko.style.display = (proto === 'shinko') ? 'flex' : 'none';
-    if (grpAnd) grpAnd.style.display = (proto === 'and') ? 'flex' : 'none';
+    if (grpMettler) grpMettler.style.display = (proto === 'mettler' || proto === 'auto') ? 'grid' : 'none';
+    if (grpShinko) grpShinko.style.display = (proto === 'shinko') ? 'grid' : 'none';
+    if (grpAnd) grpAnd.style.display = (proto === 'and') ? 'grid' : 'none';
 }
 
 async function connectActiveScale() {
@@ -745,8 +745,7 @@ async function sendManualScaleCmd() {
 
 function clearTerminalLogs() {
     terminalLogBuffer = [];
-    const term = document.getElementById('scaleLogTerminal');
-    if (term) term.innerHTML = '';
+    renderTerminalLogs();
 }
 
 function renderTerminalLogs() {
@@ -754,6 +753,11 @@ function renderTerminalLogs() {
     if (!term) return;
     const showHex = document.getElementById('chkShowHex')?.checked || false;
     const autoscroll = document.getElementById('chkAutoscroll')?.checked !== false;
+
+    if (!terminalLogBuffer || terminalLogBuffer.length === 0) {
+        term.innerHTML = '<div style="color: #64748b; font-style: italic; display: flex; align-items: center; justify-content: center; height: 100%; min-height: 280px;">/* Menunggu data serial masuk dari port terpilih... */</div>';
+        return;
+    }
 
     let html = '';
     terminalLogBuffer.forEach(entry => {
@@ -895,7 +899,7 @@ function updateScaleTable(scales) {
     if (!tbody) return;
     tbody.innerHTML = '';
     if (!scales || scales.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Tidak ada timbangan terdaftar</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Tidak ada timbangan terdaftar</td></tr>';
         return;
     }
     scales.forEach(s => {
@@ -915,32 +919,36 @@ function updateScaleTable(scales) {
         tr.onclick = () => selectScalePort(s.port);
 
         const isFreeForJs = !s.connected && (s.status_detail && (s.status_detail.includes('Startup nonaktif') || s.status_detail.includes('port bebas')));
-        const connBadge = s.connected
-            ? '<span class="badge badge-success">🟢 Terhubung</span>'
-            : (isFreeForJs
-                ? '<span class="badge badge-warning" title="Port COM bebas untuk Web Serial JS browser">⚪ Bebas untuk JS</span>'
-                : '<span class="badge badge-danger">🔴 Terputus</span>');
+        let connBadge = '';
+        if (s.connected) {
+            connBadge = '<span class="badge badge-success">🟢 Terhubung</span>';
+        } else if (s.state === 'paused') {
+            connBadge = '<span class="badge badge-warning">⏸️ Dilepas (Bebas)</span>';
+        } else if (isFreeForJs) {
+            connBadge = '<span class="badge badge-warning" title="Port COM bebas untuk Web Serial JS browser">⚪ Bebas untuk JS</span>';
+        } else {
+            connBadge = '<span class="badge badge-danger">🔴 Terputus</span>';
+        }
 
         const consoleBadge = isActiveConsole
-            ? '<span class="badge badge-success" style="font-weight: 700; font-size: 0.78rem;">🎯 AKTIF DI KONSOL</span>'
+            ? '<span class="badge badge-success" style="font-weight: 700; font-size: 0.78rem; padding: 4px 8px;">🎯 AKTIF DI KONSOL</span>'
             : `<button class="btn btn-secondary" style="font-size: 0.75rem; padding: 3px 10px;" onclick="event.stopPropagation(); selectScalePort('${s.port}')">Pilih Timbangan</button>`;
 
         const weightFormatted = (s.weight !== null && s.weight !== undefined) ? Number(s.weight).toFixed(2) : '--.--';
         const weightColor = s.connected ? '#10b981' : '#94a3b8';
         const stabilityIcon = s.connected
-            ? (s.stable ? '<span style="color:#10b981; font-weight: bold;" title="Stabil">✓</span>' : '<span style="color:#f59e0b; font-weight: bold;" title="Dinamis">~</span>')
+            ? (s.stable ? '<span style="color:#10b981; font-weight: bold; margin-left: 4px;" title="Stabil">✓</span>' : '<span style="color:#f59e0b; font-weight: bold; margin-left: 4px;" title="Dinamis">~</span>')
             : '';
 
         tr.innerHTML = `
             <td>${consoleBadge}</td>
             <td><b>${s.name}</b></td>
-            <td><code>${s.port}</code></td>
-            <td><span class="badge badge-secondary">${(s.protocol || 'auto').toUpperCase()}</span></td>
-            <td><span class="badge ${s.state === 'online' ? 'badge-success' : (s.state === 'standby' || s.state === 'paused' ? 'badge-warning' : 'badge-secondary')}">${s.state}</span></td>
+            <td><code style="background: rgba(255,255,255,0.06); padding: 3px 7px; border-radius: 4px; font-weight: 600;">${s.port}</code></td>
+            <td><span class="badge badge-secondary">${(s.protocol || 'auto').toUpperCase()} • ${s.baud || 9600}</span></td>
             <td>${connBadge}</td>
-            <td><b style="font-family: monospace; font-size: 1.05rem; color: ${weightColor};">${weightFormatted} ${s.unit || 'g'}</b> ${stabilityIcon}</td>
+            <td><b style="font-family: 'Consolas', monospace; font-size: 1.05rem; color: ${weightColor};">${weightFormatted} ${s.unit || 'g'}</b> ${stabilityIcon}</td>
             <td style="text-align: center;">
-                <button class="btn btn-primary" style="font-size: 0.75rem; padding: 3px 12px;" onclick="event.stopPropagation(); selectScalePort('${s.port}')" title="Kendalikan timbangan ini di konsol atas">🔍 Uji</button>
+                <button class="btn btn-primary" style="font-size: 0.75rem; padding: 4px 12px; font-weight: 600;" onclick="event.stopPropagation(); selectScalePort('${s.port}')" title="Kendalikan timbangan ini di konsol atas">🔍 Uji di Konsol</button>
             </td>
         `;
         tbody.appendChild(tr);

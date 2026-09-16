@@ -114,70 +114,106 @@
 
     <!-- TAB 2: TIMBANGAN DIGITAL & TESTING CONSOLE -->
     <section id="tab-scales" class="tab-content" style="display: none;">
-      <!-- Connection & Scale Selection Card -->
-      <div class="card" style="margin-bottom: 1.25rem;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
-          <div style="display: flex; align-items: center; gap: 0.65rem;">
-            <span id="ctrlStatusDot" style="font-size: 1.3rem;">🔴</span>
+      
+      <!-- 1. BAGIAN ATAS: MULTI-SCALE MONITOR & INSTANT SWITCHER -->
+      <div class="card" style="margin-bottom: 1.25rem; padding: 1.25rem;">
+        <div class="card-title" style="margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.2rem;">⚖️</span>
             <div>
-              <div style="font-weight: 700; font-size: 1.05rem;" id="ctrlStatusText">Pilih Timbangan untuk Mengontrol</div>
-              <small style="color: var(--text-muted); font-size: 0.8rem;" id="ctrlSubStatusText">Pilih port atau klik baris pada tabel di bawah untuk beralih timbangan</small>
+              <span style="font-weight: 700; font-size: 1.05rem;">Daftar Seluruh Timbangan Terhubung (Multi-Scale Monitor)</span>
+              <small style="display: block; font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">
+                Klik salah satu baris timbangan di bawah untuk langsung beralih kendali ke konsol &amp; layar di bawah
+              </small>
             </div>
           </div>
-          <div class="btn-group" style="margin: 0;">
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" style="font-size: 0.82rem; padding: 0.4rem 0.85rem;" onclick="loadScales()">🔄 Refresh Tabel</button>
             <button class="btn btn-secondary" style="font-size: 0.82rem; padding: 0.4rem 0.85rem;" onclick="restartScaleService()">⟳ Restart Service</button>
-            <button class="btn btn-warning" style="font-size: 0.82rem; padding: 0.4rem 0.85rem;" id="btnCtrlPause" onclick="togglePausePort()" title="Bebaskan port agar bisa dipakai Web Serial browser atau Delphi">⏸️ Lepas Port</button>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 160px;">Konsol Aktif</th>
+              <th>Nama Timbangan</th>
+              <th>Port Serial</th>
+              <th>Protokol</th>
+              <th>Status Koneksi</th>
+              <th>Berat Real-time</th>
+              <th style="width: 140px; text-align: center;">Aksi Cepat</th>
+            </tr>
+          </thead>
+          <tbody id="scaleTableBody">
+            <tr><td colspan="7" style="text-align: center; padding: 1.5rem;">Memuat daftar timbangan...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 2. BAGIAN TENGAH: KONSOL AKTIF (TOOLBAR + LCD/KEYPAD + TERMINAL) -->
+      <!-- Connection & Scale Selection Card -->
+      <div class="card" style="margin-bottom: 1.25rem; padding: 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--border); padding-bottom: 0.85rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span id="ctrlStatusDot" style="font-size: 1.5rem; line-height: 1;">🔴</span>
+            <div>
+              <div style="font-weight: 700; font-size: 1.1rem;" id="ctrlStatusText">Pilih Timbangan untuk Mengontrol</div>
+              <small style="color: var(--text-muted); font-size: 0.82rem;" id="ctrlSubStatusText">Pilih port atau klik salah satu baris pada tabel di atas untuk beralih kontrol</small>
+            </div>
+          </div>
+          <div class="btn-group" style="margin: 0; display: flex; gap: 8px;">
+            <button class="btn btn-warning" style="font-size: 0.82rem; height: 36px; padding: 0 0.9rem; font-weight: 600;" id="btnCtrlPause" onclick="togglePausePort()" title="Bebaskan port agar bisa dipakai Web Serial browser atau Delphi">⏸️ Lepas Port</button>
           </div>
         </div>
 
-        <!-- Connection Settings Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; align-items: flex-end;">
-          <div style="grid-column: span 2;">
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">🎯 Timbangan / Port Terpilih</label>
+        <!-- Connection Settings Flex Toolbar -->
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;">
+          <div style="flex: 2.2; min-width: 250px;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">🎯 Timbangan Terpilih</label>
             <div style="display: flex; gap: 6px;">
-              <select id="ctrlPort" onchange="onSelectedPortChange()" style="flex: 1; font-weight: 600;"></select>
-              <button class="btn btn-secondary" onclick="loadControlPorts()" title="Pindai port serial ulang" style="padding: 0 0.75rem;">⟳</button>
+              <select id="ctrlPort" onchange="onSelectedPortChange()" style="flex: 1; font-weight: 600; height: 38px; margin: 0;"></select>
+              <button class="btn btn-secondary" onclick="loadControlPorts()" title="Pindai port serial ulang" style="height: 38px; width: 38px; padding: 0; justify-content: center;">⟳</button>
             </div>
           </div>
-          <div>
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Protokol</label>
-            <select id="ctrlProtocol" onchange="onProtocolPresetChange()" style="width: 100%;">
+          <div style="flex: 1.3; min-width: 160px;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">Protokol</label>
+            <select id="ctrlProtocol" onchange="onProtocolPresetChange()" style="width: 100%; height: 38px; margin: 0;">
               <option value="shinko" selected>Shinko / ViBRA (O9)</option>
               <option value="mettler">Mettler MT-SICS (SI)</option>
               <option value="and">A&amp;D (Q)</option>
               <option value="auto">🔎 Auto-detect</option>
             </select>
           </div>
-          <div>
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Baudrate</label>
-            <select id="ctrlBaud" style="width: 100%;">
+          <div style="flex: 1; min-width: 100px;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">Baudrate</label>
+            <select id="ctrlBaud" style="width: 100%; height: 38px; margin: 0;">
               <option>600</option><option>1200</option><option>2400</option>
               <option>4800</option><option selected>9600</option><option>19200</option><option>38400</option>
             </select>
           </div>
-          <div>
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Data / Paritas</label>
-            <select id="ctrlFrame" style="width: 100%;">
+          <div style="flex: 1; min-width: 100px;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">Data / Paritas</label>
+            <select id="ctrlFrame" style="width: 100%; height: 38px; margin: 0;">
               <option value="8N" selected>8 / None</option>
               <option value="7N">7 / None</option>
               <option value="7E">7 / Even</option>
               <option value="7O">7 / Odd</option>
             </select>
           </div>
-          <div>
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Interval Poll</label>
-            <input type="number" id="ctrlInterval" value="0.5" min="0.1" step="0.1" style="width: 100%;">
+          <div style="flex: 0.8; min-width: 80px;">
+            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">Interval (s)</label>
+            <input type="number" id="ctrlInterval" value="0.5" min="0.1" step="0.1" style="width: 100%; height: 38px; margin: 0;">
           </div>
-          <div style="display: flex; gap: 6px;">
-            <button class="btn btn-primary" id="btnCtrlConnect" onclick="connectActiveScale()" style="flex: 1;">Connect</button>
-            <button class="btn btn-secondary" id="btnCtrlDisconnect" onclick="disconnectActiveScale()" disabled style="flex: 1;">Disconnect</button>
-            <button class="btn btn-secondary" id="btnCtrlScan" onclick="scanBaudActiveScale()" title="Coba semua baudrate otomatis">🔍 Scan</button>
+          <div style="display: flex; gap: 6px; align-items: center; min-width: 250px;">
+            <button class="btn btn-primary" id="btnCtrlConnect" onclick="connectActiveScale()" style="height: 38px; padding: 0 1rem; font-size: 0.85rem; font-weight: 600;">🔌 Connect</button>
+            <button class="btn btn-secondary" id="btnCtrlDisconnect" onclick="disconnectActiveScale()" disabled style="height: 38px; padding: 0 1rem; font-size: 0.85rem; font-weight: 600;">Disconnect</button>
+            <button class="btn btn-secondary" id="btnCtrlScan" onclick="scanBaudActiveScale()" title="Coba semua baudrate otomatis" style="height: 38px; padding: 0 0.85rem; font-size: 0.85rem;">🔍 Scan</button>
           </div>
         </div>
 
-        <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 10px; line-height: 1.4; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
-          <span>💡 <b>Preset:</b> Shinko &bull; 9600 8/None &bull; Mettler MT-SICS &bull; 9600 8/None &bull; A&amp;D &bull; 2400 7/Even.</span>
-          <span class="badge badge-secondary" style="font-weight: 500;">Pilih <b>SIM</b> untuk mode simulator tanpa timbangan fisik</span>
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+          <span>💡 <b>Preset Standar:</b> Shinko &bull; 9600 8/None &bull; Mettler MT-SICS &bull; 9600 8/None &bull; A&amp;D &bull; 2400 7/Even</span>
+          <span class="badge badge-secondary" style="font-weight: 500;">Pilih <b>SIM</b> untuk mode simulator virtual</span>
         </div>
       </div>
 
@@ -185,116 +221,94 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.25rem; align-items: stretch;">
         
         <!-- Left: LCD Display & Quick Controls -->
-        <div class="card" style="margin: 0; display: flex; flex-direction: column; justify-content: space-between;">
+        <div class="card" style="margin: 0; display: flex; flex-direction: column; justify-content: space-between; height: 100%; padding: 1.25rem;">
           <!-- Sleek LCD Bezel Panel -->
-          <div style="background: #090d14; border: 2px solid #1e293b; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: inset 0 2px 8px rgba(0,0,0,0.6);">
+          <div style="background: #070b12; border: 2px solid #1e293b; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: inset 0 2px 10px rgba(0,0,0,0.7);">
             <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
               <span id="lcdScaleTitle" style="font-weight: 700; font-size: 0.95rem; color: #38bdf8;">🎯 Timbangan Aktif</span>
               <div style="display: flex; gap: 6px;">
-                <span id="conn-badge" class="badge badge-danger">Terputus</span>
-                <span id="stable-badge" class="badge badge-warning" style="display: none;">Dinamis</span>
+                <span id="conn-badge" class="badge badge-danger">🔴 Terputus</span>
+                <span id="stable-badge" class="badge badge-warning" style="display: none;">⚡ Dinamis</span>
                 <span id="age-badge" class="badge badge-primary" style="display: none;">0.0s</span>
               </div>
             </div>
 
             <!-- Big Glowing Digits -->
-            <div style="display: flex; align-items: baseline; justify-content: center; padding: 0.75rem 0;">
-              <span id="lcdWeightVal" style="font-family: 'Consolas', 'Courier New', monospace; font-size: 3.8rem; font-weight: 800; color: #10b981; text-shadow: 0 0 12px rgba(16,185,129,0.4); line-height: 1;">--.--</span>
+            <div style="display: flex; align-items: baseline; justify-content: center; padding: 0.85rem 0; background: rgba(0,0,0,0.3); border-radius: 8px; margin: 0.5rem 0;">
+              <span id="lcdWeightVal" style="font-family: 'Consolas', 'Courier New', monospace; font-size: 4rem; font-weight: 900; color: #10b981; text-shadow: 0 0 16px rgba(16,185,129,0.5); letter-spacing: 2px; line-height: 1;">--.--</span>
               <span id="lcdUnitVal" style="font-family: 'Consolas', monospace; font-size: 1.6rem; font-weight: 700; color: #34d399; margin-left: 0.5rem;">g</span>
             </div>
 
-            <div id="scaleDetailStatus" style="font-size: 0.82rem; color: #94a3b8; text-align: center; min-height: 1.2em; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem;">
+            <div id="scaleDetailStatus" style="font-size: 0.82rem; color: #94a3b8; text-align: center; min-height: 1.2em; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
               Menunggu pembacaan...
             </div>
           </div>
 
-          <!-- Protocol Quick Command Buttons -->
+          <!-- Protocol Quick Command Buttons (Neat 3x2 Grid with Enhanced Ergonomics) -->
           <div>
-            <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 6px;">Perintah Cepat Timbangan:</label>
+            <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+              <span>Keypad Operasi Kasir:</span>
+              <span style="font-size: 0.75rem; color: #64748b;">Respons Cepat</span>
+            </div>
             
-            <div class="btn-group" id="cmds-shinko" style="margin-bottom: 0.75rem; flex-wrap: wrap;">
-              <button class="btn btn-secondary" onclick="sendScaleCmd('Z')">0️⃣ Zero (Z)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('T')">⚖️ Tare (T)</button>
-              <button class="btn btn-success" onclick="sendScaleCmd('O8')">🔒 Baca Stabil (O8)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('O9')">⚡ Baca Langsung (O9)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('O1')">▶️ Start Stream (O1)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('O0')">⏹️ Stop (O0)</button>
+            <div id="cmds-shinko" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 0.85rem;">
+              <button class="btn btn-secondary" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 600;" onclick="sendScaleCmd('Z')">0️⃣ ZERO (Z)</button>
+              <button class="btn btn-secondary" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 600;" onclick="sendScaleCmd('T')">⚖️ TARE (T)</button>
+              <button class="btn btn-success" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 700; box-shadow: 0 2px 8px rgba(16,185,129,0.25);" onclick="sendScaleCmd('O8')">🔒 BACA STABIL (O8)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('O9')">⚡ Baca Cepat (O9)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('O1')">▶️ Stream (O1)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('O0')">⏹️ Stop (O0)</button>
             </div>
 
-            <div class="btn-group" id="cmds-mettler" style="margin-bottom: 0.75rem; flex-wrap: wrap; display: none;">
-              <button class="btn btn-secondary" onclick="sendScaleCmd('Z')">0️⃣ Zero (Z)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('T')">⚖️ Tare (T)</button>
-              <button class="btn btn-success" onclick="sendScaleCmd('S')">🔒 Baca Stabil (S)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('SI')">⚡ Baca Langsung (SI)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('SIR')">▶️ Start Continuous (SIR)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('@')">⏹️ Stop / Reset (@)</button>
+            <div id="cmds-mettler" style="display: none; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 0.85rem;">
+              <button class="btn btn-secondary" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 600;" onclick="sendScaleCmd('Z')">0️⃣ ZERO (Z)</button>
+              <button class="btn btn-secondary" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 600;" onclick="sendScaleCmd('T')">⚖️ TARE (T)</button>
+              <button class="btn btn-success" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 700; box-shadow: 0 2px 8px rgba(16,185,129,0.25);" onclick="sendScaleCmd('S')">🔒 BACA STABIL (S)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('SI')">⚡ Baca Cepat (SI)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('SIR')">▶️ Stream (SIR)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('@')">⏹️ Stop / Reset (@)</button>
             </div>
 
-            <div class="btn-group" id="cmds-and" style="margin-bottom: 0.75rem; flex-wrap: wrap; display: none;">
-              <button class="btn btn-secondary" onclick="sendScaleCmd('Z')">0️⃣ Zero (Z)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('T')">⚖️ Tare (T)</button>
-              <button class="btn btn-success" onclick="sendScaleCmd('S')">🔒 Baca Stabil (S)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('Q')">⚡ Baca Langsung (Q)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('SIR')">▶️ Start Continuous (SIR)</button>
-              <button class="btn btn-secondary" onclick="sendScaleCmd('C')">⏹️ Stop (C)</button>
+            <div id="cmds-and" style="display: none; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 0.85rem;">
+              <button class="btn btn-secondary" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 600;" onclick="sendScaleCmd('Z')">0️⃣ ZERO (Z)</button>
+              <button class="btn btn-secondary" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 600;" onclick="sendScaleCmd('T')">⚖️ TARE (T)</button>
+              <button class="btn btn-success" style="height: 42px; justify-content: center; font-size: 0.85rem; font-weight: 700; box-shadow: 0 2px 8px rgba(16,185,129,0.25);" onclick="sendScaleCmd('S')">🔒 BACA STABIL (S)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('Q')">⚡ Baca Cepat (Q)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('SIR')">▶️ Stream (SIR)</button>
+              <button class="btn btn-secondary" style="height: 38px; justify-content: center; font-size: 0.82rem;" onclick="sendScaleCmd('C')">⏹️ Stop (C)</button>
             </div>
 
             <!-- Manual Command Input -->
             <div style="display: flex; gap: 6px;">
-              <input type="text" id="manualCmdInput" placeholder="Ketik perintah kustom (misal: O9, SI, Z, I4)..." style="flex: 1;" onkeypress="if(event.key==='Enter') sendManualScaleCmd()">
-              <button class="btn btn-primary" onclick="sendManualScaleCmd()" style="padding: 0 1rem;">Kirim</button>
+              <input type="text" id="manualCmdInput" placeholder="Ketik perintah serial kustom (misal: O9, SI, Z, I4)..." style="flex: 1; height: 38px; margin: 0; font-family: monospace;" onkeypress="if(event.key==='Enter') sendManualScaleCmd()">
+              <button class="btn btn-primary" onclick="sendManualScaleCmd()" style="height: 38px; padding: 0 1.25rem; font-weight: 600;">Kirim</button>
             </div>
           </div>
         </div>
 
         <!-- Right: Live Serial Monitor / Terminal -->
-        <div class="card" style="margin: 0; display: flex; flex-direction: column;">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 0.82rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 0.6rem; margin-bottom: 0.6rem;">
-            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-              <span>Baris: <b id="st-lines" style="color: var(--text-main);">0</b></span>
-              <span>Total: <b id="st-bytes" style="color: var(--text-main);">0</b> B</span>
-              <span>Rate: <b id="st-rate" style="color: var(--text-main);">0</b> B/s</span>
+        <div class="card" style="margin: 0; display: flex; flex-direction: column; justify-content: space-between; height: 100%; padding: 1.25rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 0.82rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 0.65rem; margin-bottom: 0.65rem;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <span class="badge" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.78rem; padding: 4px 8px;">Baris: <b id="st-lines" style="color: #fff;">0</b></span>
+              <span class="badge" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.78rem; padding: 4px 8px;">Total: <b id="st-bytes" style="color: #fff;">0</b> B</span>
+              <span class="badge" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.78rem; padding: 4px 8px;">Rate: <b id="st-rate" style="color: #fff;">0</b> B/s</span>
             </div>
             <div style="display: flex; gap: 10px; align-items: center;">
-              <label style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.82rem;">
                 <input type="checkbox" id="chkShowHex" onchange="renderTerminalLogs()"> Hex
               </label>
-              <label style="cursor: pointer; display: flex; align-items: center; gap: 4px;">
+              <label style="cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.82rem;">
                 <input type="checkbox" id="chkAutoscroll" checked> Autoscroll
               </label>
-              <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;" onclick="clearTerminalLogs()">Bersihkan</button>
+              <button class="btn btn-secondary" style="font-size: 0.75rem; height: 28px; padding: 0 0.6rem;" onclick="clearTerminalLogs()">Bersihkan</button>
             </div>
           </div>
-          <div id="scaleLogTerminal" style="flex: 1; min-height: 290px; max-height: 330px; font-family: 'Consolas', Monaco, monospace; font-size: 0.82rem; background: #0b0f17; color: #cbd5e1; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 14px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.6;"></div>
+          <div id="scaleLogTerminal" style="flex: 1; min-height: 310px; max-height: 340px; font-family: 'Consolas', Monaco, monospace; font-size: 0.82rem; background: #060910; color: #cbd5e1; border: 1px solid #1e293b; border-radius: 8px; padding: 12px 14px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.6;"></div>
         </div>
       </div>
 
-      <!-- Multi-Scale Monitor Table -->
-      <div class="card" style="margin-bottom: 1.25rem;">
-        <div class="card-title">
-          <span>📊 Daftar Seluruh Timbangan Terdaftar (Multi-Scale Monitor)</span>
-          <button class="btn btn-secondary" onclick="loadScales()">🔄 Refresh Tabel</button>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 140px;">Fokus Konsol</th>
-              <th>Nama Timbangan</th>
-              <th>Port</th>
-              <th>Protokol</th>
-              <th>Status</th>
-              <th>Koneksi</th>
-              <th>Berat Saat Ini</th>
-              <th style="width: 130px; text-align: center;">Aksi</th>
-            </tr>
-          </thead>
-          <tbody id="scaleTableBody">
-            <tr><td colspan="8" style="text-align: center;">Memuat daftar timbangan...</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- Startup Preference Banner -->
+      <!-- 3. BAGIAN BAWAH: STARTUP SETTING -->
       <div style="background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
         <div style="display: flex; align-items: center; gap: 0.75rem;">
           <span style="font-size: 1.3rem;">⚡</span>
