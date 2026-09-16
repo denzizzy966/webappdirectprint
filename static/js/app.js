@@ -74,8 +74,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     // Reactive weight stream dari WebSocket
     bridge.onWeightChange((scales) => {
         if (scales && scales.length > 0) {
-            const active = scales.find(s => s.connected && s.port !== 'SIM') || scales.find(s => s.connected) || scales[0];
-            updateLcdDisplay(active);
+            const active = getActiveConsoleScale(scales);
+            if (active) updateLcdDisplay(active);
             updateScaleTable(scales);
         }
     });
@@ -87,8 +87,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             try {
                 const data = JSON.parse(e.data);
                 if (data.scales && data.scales.length > 0) {
-                    const active = data.scales.find(s => s.connected && s.port !== 'SIM') || data.scales.find(s => s.connected) || data.scales[0];
-                    updateLcdDisplay(active);
+                    const active = getActiveConsoleScale(data.scales);
+                    if (active) updateLcdDisplay(active);
                     updateScaleTable(data.scales);
                 }
             } catch (err) {}
@@ -303,6 +303,53 @@ function testPrintSpecific(printerName) {
 let terminalLastLogId = 0;
 let terminalLogBuffer = [];
 let isScalePaused = false;
+let currentSelectedScalePort = null;
+let lastKnownScales = [];
+
+function getActiveConsoleScale(scales) {
+    if (!scales || scales.length === 0) return null;
+    lastKnownScales = scales;
+
+    // 1. Cek port yang sedang dipilih pengguna
+    if (currentSelectedScalePort) {
+        const match = scales.find(s =>
+            (s.port && s.port.toLowerCase() === currentSelectedScalePort.toLowerCase()) ||
+            (s.name && s.name.toLowerCase() === currentSelectedScalePort.toLowerCase())
+        );
+        if (match) return match;
+    }
+
+    // 2. Cek nilai pada dropdown #ctrlPort
+    const selPort = document.getElementById('ctrlPort')?.value;
+    if (selPort) {
+        const match = scales.find(s =>
+            (s.port && s.port.toLowerCase() === selPort.toLowerCase()) ||
+            (s.name && s.name.toLowerCase() === selPort.toLowerCase())
+        );
+        if (match) {
+            currentSelectedScalePort = match.port || selPort;
+            return match;
+        }
+    }
+
+    // 3. Fallback: timbangan fisik pertama yang terhubung, atau simulator, atau elemen pertama
+    const active = scales.find(s => s.connected && s.port !== 'SIM') ||
+                   scales.find(s => s.connected) ||
+                   scales[0];
+    if (active) {
+        currentSelectedScalePort = active.port;
+        const ctrlPortEl = document.getElementById('ctrlPort');
+        if (ctrlPortEl && ctrlPortEl.value !== active.port) {
+            for (let opt of ctrlPortEl.options) {
+                if (opt.value.toLowerCase() === active.port.toLowerCase()) {
+                    ctrlPortEl.value = opt.value;
+                    break;
+                }
+            }
+        }
+    }
+    return active;
+}
 
 function updateLcdDisplay(scaleData) {
     if (!scaleData) return;
@@ -314,30 +361,47 @@ function updateLcdDisplay(scaleData) {
     const ageBadge = document.getElementById('age-badge');
     const detailStatus = document.getElementById('scaleDetailStatus');
     const statWeight = document.getElementById('statWeight');
+    const lcdScaleTitle = document.getElementById('lcdScaleTitle');
 
-    // Legacy badge fallback
-    const legacyStableBadge = document.getElementById('lcdStableBadge');
-    const legacyStateBadge = document.getElementById('lcdStateBadge');
-    const legacyScaleName = document.getElementById('lcdScaleName');
+    // Connection bar status
+    const ctrlStatusDot = document.getElementById('ctrlStatusDot');
+    const ctrlStatusText = document.getElementById('ctrlStatusText');
+    const ctrlSubStatusText = document.getElementById('ctrlSubStatusText');
 
     const isConnected = !!scaleData.connected;
-    const w = (scaleData.weight !== null && scaleData.weight !== undefined) ? scaleData.weight.toFixed(2) : '--.--';
+    const w = (scaleData.weight !== null && scaleData.weight !== undefined) ? Number(scaleData.weight).toFixed(2) : '--.--';
     const u = scaleData.unit || 'g';
+
+    if (lcdScaleTitle) {
+        lcdScaleTitle.textContent = `🎯 ${scaleData.name || 'Timbangan'} [${scaleData.port || ''}]`;
+    }
 
     if (weightVal) weightVal.textContent = isConnected ? w : '--.--';
     if (unitVal) unitVal.textContent = u;
     if (statWeight) statWeight.textContent = isConnected ? `${w} ${u}` : '0.00 g';
 
+    if (ctrlStatusDot) {
+        ctrlStatusDot.textContent = isConnected ? '🟢' : (scaleData.state === 'paused' || scaleData.state === 'standby' ? '🟡' : '🔴');
+    }
+    if (ctrlStatusText) {
+        ctrlStatusText.textContent = `${scaleData.name || 'Timbangan'} [${scaleData.port || ''}] — ${isConnected ? 'Terhubung' : 'Terputus'}`;
+    }
+    if (ctrlSubStatusText) {
+        ctrlSubStatusText.textContent = isConnected
+            ? `Protokol: ${(scaleData.protocol || 'auto').toUpperCase()} • Baud: ${scaleData.baud || 9600} • Data: ${scaleData.databits || 8}${scaleData.parity || 'N'}1`
+            : 'Pilih port atau klik baris pada tabel di bawah untuk beralih timbangan';
+    }
+
     if (connBadge) {
         if (isConnected) {
             connBadge.className = 'badge badge-success';
-            connBadge.textContent = 'Terhubung';
+            connBadge.textContent = '🟢 Terhubung';
         } else if (scaleData.state === 'paused' || scaleData.state === 'standby') {
             connBadge.className = 'badge badge-warning';
-            connBadge.textContent = 'Dilepas';
+            connBadge.textContent = '🟡 Dilepas';
         } else {
             connBadge.className = 'badge badge-danger';
-            connBadge.textContent = 'Terputus';
+            connBadge.textContent = '🔴 Terputus';
         }
     }
 
@@ -346,10 +410,10 @@ function updateLcdDisplay(scaleData) {
             stableBadge.style.display = 'inline-block';
             if (scaleData.stable) {
                 stableBadge.className = 'badge badge-success';
-                stableBadge.textContent = 'Stabil';
+                stableBadge.textContent = '🔒 Stabil';
             } else {
                 stableBadge.className = 'badge badge-warning';
-                stableBadge.textContent = 'Dinamis';
+                stableBadge.textContent = '⚡ Dinamis';
             }
         } else {
             stableBadge.style.display = 'none';
@@ -366,19 +430,7 @@ function updateLcdDisplay(scaleData) {
     }
 
     if (detailStatus) {
-        detailStatus.textContent = scaleData.status_detail || (isConnected ? `${scaleData.name || 'Timbangan'} aktif` : 'Timbangan tidak terhubung');
-    }
-
-    if (legacyStableBadge) {
-        legacyStableBadge.className = scaleData.stable ? 'badge badge-success' : 'badge badge-warning';
-        legacyStableBadge.textContent = scaleData.stable ? 'STABIL' : 'BERGERAK';
-    }
-    if (legacyStateBadge) {
-        legacyStateBadge.className = isConnected ? 'badge badge-success' : 'badge badge-danger';
-        legacyStateBadge.textContent = (scaleData.state || 'OFFLINE').toUpperCase();
-    }
-    if (legacyScaleName) {
-        legacyScaleName.textContent = `${scaleData.name || ''} [${scaleData.port || ''}]`;
+        detailStatus.textContent = scaleData.status_detail || (isConnected ? `${scaleData.name || 'Timbangan'} aktif di ${scaleData.port}` : 'Timbangan tidak terhubung');
     }
 }
 
@@ -386,37 +438,135 @@ async function loadControlPorts() {
     const sel = document.getElementById('ctrlPort');
     if (!sel) return;
     try {
-        const res = await fetch('/api/ports');
-        const ports = await res.json();
-        const prevVal = sel.value;
+        const [resPorts, resScales] = await Promise.all([
+            fetch('/api/ports').then(r => r.json()).catch(() => []),
+            fetch('/api/scales').then(r => r.json()).catch(() => ({ scales: [] }))
+        ]);
+        const ports = Array.isArray(resPorts) ? resPorts : (resPorts.ports || []);
+        const scales = resScales.scales || [];
+        lastKnownScales = scales;
+
+        const prevVal = currentSelectedScalePort || sel.value;
         sel.innerHTML = '';
 
-        // Option 1: Simulator
-        const simOpt = document.createElement('option');
-        simOpt.value = 'SIM';
-        simOpt.textContent = 'SIM — Simulator Mode (mock data)';
-        sel.appendChild(simOpt);
+        const addedPorts = new Set();
 
-        let selected = false;
-        ports.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.device;
-            opt.textContent = `${p.device}: ${p.description || 'Serial Device'}${p.connected ? ' (terhubung)' : ''}`;
-            if (p.connected) {
-                opt.selected = true;
-                selected = true;
-            } else if (!selected && prevVal && p.device === prevVal) {
-                opt.selected = true;
-                selected = true;
+        // 1. Timbangan yang terdaftar di konfigurasi bridge
+        scales.forEach(sc => {
+            if (sc.port && !addedPorts.has(sc.port.toUpperCase())) {
+                addedPorts.add(sc.port.toUpperCase());
+                const opt = document.createElement('option');
+                opt.value = sc.port;
+                const statusDot = sc.connected ? '🟢' : '🔴';
+                opt.textContent = `${sc.port}: ${sc.name} (${statusDot} ${sc.connected ? 'Terhubung' : 'Terputus'})`;
+                sel.appendChild(opt);
             }
-            sel.appendChild(opt);
         });
 
-        if (!selected && (prevVal === 'SIM' || !prevVal)) {
-            simOpt.selected = true;
+        // 2. Deteksi port fisik yang terpasang di sistem
+        ports.forEach(p => {
+            const dev = p.device;
+            if (dev && !addedPorts.has(dev.toUpperCase())) {
+                addedPorts.add(dev.toUpperCase());
+                const opt = document.createElement('option');
+                opt.value = dev;
+                const statusDot = p.connected ? '🟢' : '⚪';
+                opt.textContent = `${dev}: ${p.description || 'Serial Device'} (${statusDot} ${p.connected ? 'Terhubung' : 'Bebas'})`;
+                sel.appendChild(opt);
+            }
+        });
+
+        // 3. Mode simulator jika belum ada di list
+        if (!addedPorts.has('SIM')) {
+            const simOpt = document.createElement('option');
+            simOpt.value = 'SIM';
+            simOpt.textContent = 'SIM: Simulator Mode (Virtual)';
+            sel.appendChild(simOpt);
+        }
+
+        // Pulihkan pilihan sebelumnya
+        let matched = false;
+        if (prevVal) {
+            for (let opt of sel.options) {
+                if (opt.value.toLowerCase() === prevVal.toLowerCase()) {
+                    opt.selected = true;
+                    currentSelectedScalePort = opt.value;
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        if (!matched && sel.options.length > 0) {
+            sel.options[0].selected = true;
+            currentSelectedScalePort = sel.options[0].value;
         }
     } catch (e) {
         console.warn('Gagal memuat ports control:', e);
+    }
+}
+
+function onSelectedPortChange() {
+    const sel = document.getElementById('ctrlPort');
+    if (!sel) return;
+    const newPort = sel.value;
+    currentSelectedScalePort = newPort;
+
+    // Reset log terminal untuk port baru
+    terminalLastLogId = 0;
+    terminalLogBuffer = [];
+    clearTerminalLogs();
+
+    // Sinkronkan preset protokol dan baud jika port dikenali di tabel timbangan
+    if (lastKnownScales && lastKnownScales.length > 0) {
+        const matched = lastKnownScales.find(s => s.port && s.port.toLowerCase() === newPort.toLowerCase());
+        if (matched) {
+            if (matched.protocol) {
+                const protoSel = document.getElementById('ctrlProtocol');
+                if (protoSel) {
+                    protoSel.value = matched.protocol.toLowerCase();
+                    onProtocolPresetChange();
+                }
+            }
+            if (matched.baud) {
+                const baudSel = document.getElementById('ctrlBaud');
+                if (baudSel) baudSel.value = String(matched.baud);
+            }
+            updateLcdDisplay(matched);
+        }
+        updateScaleTable(lastKnownScales);
+    }
+
+    // Segera polling state untuk port terpilih
+    pollScaleTerminal();
+}
+
+function selectScalePort(port) {
+    if (!port) return;
+    currentSelectedScalePort = port;
+    const sel = document.getElementById('ctrlPort');
+    if (sel) {
+        let found = false;
+        for (let opt of sel.options) {
+            if (opt.value.toLowerCase() === port.toLowerCase()) {
+                sel.value = opt.value;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            const newOpt = document.createElement('option');
+            newOpt.value = port;
+            newOpt.textContent = port;
+            newOpt.selected = true;
+            sel.appendChild(newOpt);
+        }
+    }
+    onSelectedPortChange();
+
+    // Scroll ke atas dengan halus menuju LCD konsol
+    const topBar = document.getElementById('ctrlPort');
+    if (topBar) {
+        topBar.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
 
@@ -564,7 +714,7 @@ async function restartScaleService() {
 }
 
 async function sendScaleCmd(cmd) {
-    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
     addLog(`Mengirim perintah [${cmd}] ke ${port}...`);
     try {
         const res = await fetch('/api/command', {
@@ -628,11 +778,18 @@ function renderTerminalLogs() {
 }
 
 async function pollScaleTerminal() {
-    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
     try {
         const res = await fetch(`/api/scale/state?port=${encodeURIComponent(port)}&since=${terminalLastLogId}`);
         if (!res.ok) return;
         const state = await res.json();
+
+        // Safety check: jika user beralih port lain saat request sedang jalan, abaikan respon lama
+        if (currentSelectedScalePort && state.port && 
+            state.port.toLowerCase() !== currentSelectedScalePort.toLowerCase() &&
+            !(currentSelectedScalePort.toUpperCase() === 'SIM' && state.sim)) {
+            return;
+        }
 
         // Update metrics
         const elLines = document.getElementById('st-lines');
@@ -643,24 +800,13 @@ async function pollScaleTerminal() {
         if (elRate) elRate.textContent = state.bytes_per_sec !== undefined ? state.bytes_per_sec : 0;
 
         // Update Connection Status Bar
-        const dot = document.getElementById('ctrlStatusDot');
-        const text = document.getElementById('ctrlStatusText');
         const btnConn = document.getElementById('btnCtrlConnect');
         const btnDisc = document.getElementById('btnCtrlDisconnect');
 
         if (state.connected) {
-            if (dot) dot.textContent = '🟢';
-            if (text) text.textContent = `${state.port || port} (${state.baud || 9600} ${state.databits || 8}${state.parity || 'N'}1) — terhubung`;
             if (btnConn) btnConn.disabled = true;
             if (btnDisc) btnDisc.disabled = false;
-        } else if (state.state === 'paused' || state.state === 'standby') {
-            if (dot) dot.textContent = '🟡';
-            if (text) text.textContent = `${state.port || port} — port dilepas (standby)`;
-            if (btnConn) btnConn.disabled = false;
-            if (btnDisc) btnDisc.disabled = true;
         } else {
-            if (dot) dot.textContent = '🔴';
-            if (text) text.textContent = `${state.port || port} — terputus`;
             if (btnConn) btnConn.disabled = false;
             if (btnDisc) btnDisc.disabled = true;
         }
@@ -748,8 +894,26 @@ function updateScaleTable(scales) {
     const tbody = document.getElementById('scaleTableBody');
     if (!tbody) return;
     tbody.innerHTML = '';
+    if (!scales || scales.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: var(--text-muted);">Tidak ada timbangan terdaftar</td></tr>';
+        return;
+    }
     scales.forEach(s => {
         const tr = document.createElement('tr');
+        const isActiveConsole = currentSelectedScalePort && (
+            (s.port && s.port.toLowerCase() === currentSelectedScalePort.toLowerCase()) ||
+            (s.name && s.name.toLowerCase() === currentSelectedScalePort.toLowerCase())
+        );
+
+        if (isActiveConsole) {
+            tr.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+            tr.style.borderLeft = '4px solid #10b981';
+        } else {
+            tr.style.borderLeft = '4px solid transparent';
+        }
+        tr.style.cursor = 'pointer';
+        tr.onclick = () => selectScalePort(s.port);
+
         const isFreeForJs = !s.connected && (s.status_detail && (s.status_detail.includes('Startup nonaktif') || s.status_detail.includes('port bebas')));
         const connBadge = s.connected
             ? '<span class="badge badge-success">🟢 Terhubung</span>'
@@ -757,13 +921,27 @@ function updateScaleTable(scales) {
                 ? '<span class="badge badge-warning" title="Port COM bebas untuk Web Serial JS browser">⚪ Bebas untuk JS</span>'
                 : '<span class="badge badge-danger">🔴 Terputus</span>');
 
+        const consoleBadge = isActiveConsole
+            ? '<span class="badge badge-success" style="font-weight: 700; font-size: 0.78rem;">🎯 AKTIF DI KONSOL</span>'
+            : `<button class="btn btn-secondary" style="font-size: 0.75rem; padding: 3px 10px;" onclick="event.stopPropagation(); selectScalePort('${s.port}')">Pilih Timbangan</button>`;
+
+        const weightFormatted = (s.weight !== null && s.weight !== undefined) ? Number(s.weight).toFixed(2) : '--.--';
+        const weightColor = s.connected ? '#10b981' : '#94a3b8';
+        const stabilityIcon = s.connected
+            ? (s.stable ? '<span style="color:#10b981; font-weight: bold;" title="Stabil">✓</span>' : '<span style="color:#f59e0b; font-weight: bold;" title="Dinamis">~</span>')
+            : '';
+
         tr.innerHTML = `
+            <td>${consoleBadge}</td>
             <td><b>${s.name}</b></td>
             <td><code>${s.port}</code></td>
-            <td>${s.protocol.toUpperCase()}</td>
+            <td><span class="badge badge-secondary">${(s.protocol || 'auto').toUpperCase()}</span></td>
             <td><span class="badge ${s.state === 'online' ? 'badge-success' : (s.state === 'standby' || s.state === 'paused' ? 'badge-warning' : 'badge-secondary')}">${s.state}</span></td>
             <td>${connBadge}</td>
-            <td><b>${s.weight !== null ? s.weight : '--.--'} ${s.unit}</b> ${s.stable ? '✓' : '~'}</td>
+            <td><b style="font-family: monospace; font-size: 1.05rem; color: ${weightColor};">${weightFormatted} ${s.unit || 'g'}</b> ${stabilityIcon}</td>
+            <td style="text-align: center;">
+                <button class="btn btn-primary" style="font-size: 0.75rem; padding: 3px 12px;" onclick="event.stopPropagation(); selectScalePort('${s.port}')" title="Kendalikan timbangan ini di konsol atas">🔍 Uji</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
@@ -777,9 +955,12 @@ async function loadScales() {
             updateScaleStartupUI(json.enable_scale_at_startup);
         }
         const scales = json.scales || [];
+        lastKnownScales = scales;
         if (scales.length > 0) {
-            const active = scales.find(s => s.connected && s.port !== 'SIM') || scales.find(s => s.connected) || scales[0];
-            updateLcdDisplay(active);
+            const active = getActiveConsoleScale(scales);
+            if (active) {
+                updateLcdDisplay(active);
+            }
             updateScaleTable(scales);
         }
     } catch (e) {
@@ -788,36 +969,41 @@ async function loadScales() {
 }
 
 async function sendZero() {
-    addLog('Mengirim perintah ZERO ke timbangan...');
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Mengirim perintah ZERO ke timbangan ${port}...`);
     try {
-        const res = await fetch('/api/scale/zero', { method: 'POST' });
+        const res = await fetch(`/api/scale/zero?scale=${encodeURIComponent(port)}`, { method: 'POST' });
         const json = await res.json();
-        addLog(json.status === 'success' ? '✅ Zero berhasil' : '❌ Gagal Zero');
+        addLog(json.status === 'success' || json.ok ? `✅ Zero berhasil (${port})` : `❌ Gagal Zero: ${json.message || ''}`);
+        await pollScaleTerminal();
     } catch (e) {
         addLog(`❌ Error Zero: ${e.message}`, 'error');
     }
 }
 
 async function sendTare() {
-    addLog('Mengirim perintah TARE ke timbangan...');
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Mengirim perintah TARE ke timbangan ${port}...`);
     try {
-        const res = await fetch('/api/scale/tare', { method: 'POST' });
+        const res = await fetch(`/api/scale/tare?scale=${encodeURIComponent(port)}`, { method: 'POST' });
         const json = await res.json();
-        addLog(json.status === 'success' ? '✅ Tare berhasil' : '❌ Gagal Tare');
+        addLog(json.status === 'success' || json.ok ? `✅ Tare berhasil (${port})` : `❌ Gagal Tare: ${json.message || ''}`);
+        await pollScaleTerminal();
     } catch (e) {
         addLog(`❌ Error Tare: ${e.message}`, 'error');
     }
 }
 
 async function readStableWeight() {
-    addLog('Menunggu pembacaan STABIL dari timbangan (maks 5 detik)...');
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Menunggu pembacaan STABIL dari timbangan ${port} (maks 5 detik)...`);
     try {
-        const res = await fetch('/api/scale/stable-read?timeout=5.0', { method: 'POST' });
+        const res = await fetch(`/api/scale/stable-read?scale=${encodeURIComponent(port)}&timeout=5.0`, { method: 'POST' });
         const json = await res.json();
-        if (json.status === 'success') {
-            addLog(`🔒 BERAT STABIL TERKUNCI: ${json.data.weight} ${json.data.unit} (${json.elapsed_seconds}s)`, 'success');
+        if (json.status === 'success' || json.ok) {
+            addLog(`🔒 BERAT STABIL TERKUNCI [${port}]: ${json.data.weight} ${json.data.unit} (${json.elapsed_seconds}s)`, 'success');
         } else {
-            addLog(`⚠️ Timbangan belum stabil: ${json.message}`, 'warn');
+            addLog(`⚠️ Timbangan ${port} belum stabil: ${json.message || json.error}`, 'warn');
         }
     } catch (e) {
         addLog(`❌ Error stable read: ${e.message}`, 'error');
@@ -825,11 +1011,12 @@ async function readStableWeight() {
 }
 
 async function pauseScale() {
-    addLog('Melepas port serial untuk Delphi / aplikasi lain...');
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Melepas port serial (${port}) untuk Delphi / aplikasi lain...`);
     try {
-        const res = await fetch('/api/scale/pause', { method: 'POST' });
+        const res = await fetch(`/api/scale/pause?scale=${encodeURIComponent(port)}`, { method: 'POST' });
         const json = await res.json();
-        addLog('⏸️ Port serial dilepas sementara. Delphi sekarang bisa membuka port COM.');
+        addLog(`⏸️ Port serial ${port} dilepas sementara. Delphi sekarang bisa membuka port COM.`);
         loadScales();
     } catch (e) {
         addLog(`❌ Error pause: ${e.message}`, 'error');
@@ -837,9 +1024,10 @@ async function pauseScale() {
 }
 
 async function resumeScale() {
-    addLog('Menyambungkan kembali port serial...');
+    const port = currentSelectedScalePort || document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Menyambungkan kembali port serial (${port})...`);
     try {
-        const res = await fetch('/api/scale/resume', { method: 'POST' });
+        const res = await fetch(`/api/scale/resume?scale=${encodeURIComponent(port)}`, { method: 'POST' });
         const json = await res.json();
         addLog(`▶️ ${json.message || 'Port serial disambungkan kembali.'}`, 'success');
         await loadScales();

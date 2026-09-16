@@ -11,6 +11,7 @@ import time
 import socket
 import threading
 import webbrowser
+import subprocess
 from pathlib import Path
 
 try:
@@ -46,10 +47,12 @@ API_BASE = f"http://127.0.0.1:{BRIDGE_PORT}"
 bridge_status = {
     "online": False,
     "version": "2.1.0",
+    "web_port": BRIDGE_PORT,
     "default_printer": "-",
     "total_printers": 0,
     "total_scales": 0,
-    "active_weight": "-"
+    "connected_scale_ports": [],
+    "scale_info_text": "Memeriksa..."
 }
 
 def generate_icon(online: bool = True):
@@ -65,13 +68,13 @@ def generate_icon(online: bool = True):
     return img
 
 def check_status_loop(icon: pystray.Icon):
-    """Thread latar belakang untuk polling status bridge setiap 3 detik."""
+    """Thread latar belakang untuk polling status bridge setiap 2.5 detik."""
     last_online = None
     while getattr(icon, '_running', True):
         is_online = False
         try:
             if requests:
-                resp = requests.get(f"{API_BASE}/api/status", timeout=1.5)
+                resp = requests.get(f"{API_BASE}/api/status", timeout=1.8)
                 if resp.status_code == 200:
                     data = resp.json()
                     is_online = True
@@ -80,6 +83,12 @@ def check_status_loop(icon: pystray.Icon):
                     bridge_status["default_printer"] = data.get("default_printer") or "-"
                     bridge_status["total_printers"] = data.get("total_printers", 0)
                     bridge_status["total_scales"] = data.get("total_scales", 0)
+                    scale_ports = data.get("connected_scale_ports", [])
+                    bridge_status["connected_scale_ports"] = scale_ports
+                    if scale_ports:
+                        bridge_status["scale_info_text"] = ", ".join(scale_ports)
+                    else:
+                        bridge_status["scale_info_text"] = "Tidak ada aktif"
             else:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.settimeout(1.0)
@@ -89,6 +98,8 @@ def check_status_loop(icon: pystray.Icon):
             is_online = False
 
         bridge_status["online"] = is_online
+        if not is_online:
+            bridge_status["scale_info_text"] = "Service Offline"
 
         if is_online != last_online:
             last_online = is_online
@@ -99,38 +110,62 @@ def check_status_loop(icon: pystray.Icon):
             except Exception:
                 pass
 
-        time.sleep(3.0)
+        time.sleep(2.5)
 
 def open_dashboard(icon=None, item=None):
     webbrowser.open(f"http://127.0.0.1:{BRIDGE_PORT}")
 
+def get_web_port_label(item=None):
+    if bridge_status["online"]:
+        return f"🟢 Online — Port Web: {BRIDGE_PORT}"
+    return f"🔴 Offline — Port Web: {BRIDGE_PORT}"
+
+def get_scale_port_label(item=None):
+    return f"⚖️ Timbangan: {bridge_status.get('scale_info_text', 'Tidak ada aktif')}"
+
+def get_printer_label(item=None):
+    p = bridge_status.get("default_printer", "-")
+    return f"🖨️ Printer: {p[:24]}"
+
 def restart_service(icon=None, item=None):
     if sys.platform == "win32":
-        os.system("taskkill /F /IM python.exe /FI \"WINDOWTITLE eq HardwareBridge*\" 2>nul")
-        os.system(f'start cmd /c cd /d "{BASE_DIR}" && python app.py')
+        subprocess.Popen([sys.executable, str(BASE_DIR / "app.py")])
     else:
-        os.system("sudo systemctl restart hardware-bridge 2>/dev/null || true")
+        cmd = "sudo systemctl restart hardware-bridge 2>/dev/null || systemctl --user restart hardware-bridge 2>/dev/null || (pkill -f app.py && nohup python3 app.py >/dev/null 2>&1 &)"
+        os.system(cmd)
 
-def quit_tray(icon: pystray.Icon, item=None):
-    icon.stop()
+def stop_service(icon=None, item=None):
+    if sys.platform == "win32":
+        os.system('taskkill /F /IM HardwareBridge.exe 2>nul || taskkill /F /FI "WINDOWTITLE eq HardwareBridge*" 2>nul')
+    else:
+        cmd = "sudo systemctl stop hardware-bridge 2>/dev/null || systemctl --user stop hardware-bridge 2>/dev/null || pkill -f app.py"
+        os.system(cmd)
+    bridge_status["online"] = False
+    bridge_status["scale_info_text"] = "Service Dimatikan"
+    if icon:
+        try:
+            icon.icon = generate_icon(False)
+            icon.title = f"Hardware Bridge (🔴 Offline) - Port {BRIDGE_PORT}"
+        except Exception:
+            pass
+
+def quit_app(icon: pystray.Icon, item=None):
+    stop_service(icon, item)
+    if icon:
+        icon.stop()
     os._exit(0)
 
 def create_menu():
-    def get_status_label(item):
-        st = "🟢 Online" if bridge_status["online"] else "🔴 Offline"
-        return f"Status: {st} (v{bridge_status['version']})"
-
-    def get_printer_label(item):
-        return f"Default: {bridge_status['default_printer'][:22]}"
-
     return pystray.Menu(
         pystray.MenuItem("🌐 Buka Dashboard Web", open_dashboard, default=True),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem(get_status_label, None, enabled=False),
+        pystray.MenuItem(get_web_port_label, None, enabled=False),
+        pystray.MenuItem(get_scale_port_label, None, enabled=False),
         pystray.MenuItem(get_printer_label, None, enabled=False),
         pystray.Menu.SEPARATOR,
-        pystray.MenuItem("🔄 Restart Service Bridge", restart_service),
-        pystray.MenuItem("❌ Tutup Tray", quit_tray)
+        pystray.MenuItem("🔄 Restart Service", restart_service),
+        pystray.MenuItem("⏹️ Hentikan Service (Close)", stop_service),
+        pystray.MenuItem("❌ Tutup Aplikasi & Tray", quit_app)
     )
 
 def main():

@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import socket
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -176,7 +177,7 @@ async def serve_dashboard(request: Request):
 # ────────────────────────────────────────────────────────────
 
 def create_tray_icon(port: int):
-    """Membuat ikon System Tray di pojok kanan bawah desktop."""
+    """Membuat ikon System Tray di pojok kanan bawah desktop (Windows)."""
     try:
         import pystray
         from PIL import Image, ImageDraw
@@ -188,20 +189,79 @@ def create_tray_icon(port: int):
             draw.polygon([(32, 10), (22, 34), (32, 34), (28, 54), (44, 28), (34, 28)], fill=(255, 255, 255))
             return img
 
-        def open_browser(icon, item):
+        def open_browser(icon=None, item=None):
             webbrowser.open(f"http://127.0.0.1:{port}")
 
-        def quit_app(icon, item):
-            icon.stop()
+        def get_web_port_label(item=None):
+            return f"🟢 Online — Port Web: {port}"
+
+        def get_scale_port_label(item=None):
+            try:
+                active_ports = [
+                    f"{sc.port} ({sc.name})" if sc.name else sc.port
+                    for sc in scale_manager.scales.values()
+                    if sc.connected and sc.port and sc.port.upper() != "SIM"
+                ]
+                if active_ports:
+                    return f"⚖️ Timbangan: {', '.join(active_ports)}"
+                sim = any(sc.connected and sc.port == "SIM" for sc in scale_manager.scales.values())
+                if sim:
+                    return "⚖️ Timbangan: SIM (Simulator)"
+                return "⚖️ Timbangan: Tidak ada aktif"
+            except Exception:
+                return "⚖️ Timbangan: Memeriksa..."
+
+        def get_printer_label(item=None):
+            try:
+                p = printer_manager.get_default_printer() or "(Belum disetel)"
+                return f"🖨️ Printer: {p[:24]}"
+            except Exception:
+                return "🖨️ Printer: -"
+
+        def restart_app(icon=None, item=None):
+            logger.info("[Tray] Merestart Hardware Bridge...")
+            if icon:
+                try:
+                    icon.stop()
+                except Exception:
+                    pass
+            if getattr(sys, 'frozen', False):
+                subprocess.Popen([sys.executable] + sys.argv[1:])
+            else:
+                subprocess.Popen([sys.executable, str(BASE_DIR / "app.py")] + sys.argv[1:])
+            os._exit(0)
+
+        def stop_service_action(icon=None, item=None):
+            logger.info("[Tray] Menghentikan Hardware Bridge (Close Service)...")
+            if icon:
+                try:
+                    icon.stop()
+                except Exception:
+                    pass
+            os._exit(0)
+
+        def quit_app(icon=None, item=None):
+            logger.info("[Tray] Menutup Hardware Bridge & Tray...")
+            if icon:
+                try:
+                    icon.stop()
+                except Exception:
+                    pass
             os._exit(0)
 
         menu = pystray.Menu(
-            pystray.MenuItem("Buka Dashboard Bridge", open_browser, default=True),
-            pystray.MenuItem("Status: Online", None, enabled=False),
-            pystray.MenuItem("Keluar", quit_app)
+            pystray.MenuItem("🌐 Buka Dashboard Web", open_browser, default=True),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem(get_web_port_label, None, enabled=False),
+            pystray.MenuItem(get_scale_port_label, None, enabled=False),
+            pystray.MenuItem(get_printer_label, None, enabled=False),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("🔄 Restart Service", restart_app),
+            pystray.MenuItem("⏹️ Hentikan Service (Close)", stop_service_action),
+            pystray.MenuItem("❌ Tutup Aplikasi & Tray", quit_app)
         )
 
-        icon = pystray.Icon("HardwareBridge", generate_icon_image(), "WebApp Hardware Bridge", menu)
+        icon = pystray.Icon("HardwareBridge", generate_icon_image(), f"Hardware Bridge (🟢 Online) - Port {port}", menu)
         icon.run()
     except Exception as e:
         logger.warning(f"[Tray] System tray dinonaktifkan atau tidak tersedia: {e}")

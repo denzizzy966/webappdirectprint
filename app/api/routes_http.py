@@ -236,11 +236,12 @@ def update_scale_startup_config(req: ScaleStartupConfigRequest):
     }
 
 @router.get("/weight")
-def get_weight(scale: Optional[str] = Query(None)):
+def get_weight(scale: Optional[str] = Query(None), port: Optional[str] = Query(None)):
     """Mengambil berat saat ini dari timbangan (cepat & non-blocking)."""
-    instance = scale_manager.get_scale(scale)
+    target = scale or port
+    instance = scale_manager.get_scale(target)
     if not instance:
-        raise HTTPException(status_code=404, detail=f"Timbangan '{scale}' tidak ditemukan")
+        raise HTTPException(status_code=404, detail=f"Timbangan '{target}' tidak ditemukan")
     data = instance.get_data()
     return {
         "status": "success",
@@ -261,11 +262,12 @@ def get_weight(scale: Optional[str] = Query(None)):
 @router.post("/stable-read")
 async def get_stable_read(
     scale: Optional[str] = Query(None),
+    port: Optional[str] = Query(None),
     timeout: Optional[float] = Query(None),
     body: Optional[StableReadRequest] = None
 ):
     """Menunggu hingga timbangan menghasilkan data yang STABIL (maksimal timeout detik)."""
-    target_scale = scale or (body.scale if body else None)
+    target_scale = scale or port or (body.scale if body else None)
     target_timeout = timeout if timeout is not None else (body.timeout if body and body.timeout is not None else 10.0)
 
     instance = scale_manager.get_scale(target_scale)
@@ -311,22 +313,24 @@ async def get_stable_read(
     }
 
 @router.post("/scale/zero")
-def scale_zero(scale: Optional[str] = Query(None)):
+def scale_zero(scale: Optional[str] = Query(None), port: Optional[str] = Query(None)):
     """Mengirim perintah Zero (Nol) ke timbangan."""
-    instance = scale_manager.get_scale(scale)
+    target = scale or port
+    instance = scale_manager.get_scale(target)
     if not instance:
         raise HTTPException(status_code=404, detail="Timbangan tidak ditemukan")
     ok = instance.zero()
-    return {"status": "success" if ok else "error", "message": "Perintah Zero dikirim"}
+    return {"status": "success" if ok else "error", "message": f"Perintah Zero dikirim ke {instance.name} ({instance.port})", "ok": ok}
 
 @router.post("/scale/tare")
-def scale_tare(scale: Optional[str] = Query(None)):
+def scale_tare(scale: Optional[str] = Query(None), port: Optional[str] = Query(None)):
     """Mengirim perintah Tare ke timbangan."""
-    instance = scale_manager.get_scale(scale)
+    target = scale or port
+    instance = scale_manager.get_scale(target)
     if not instance:
         raise HTTPException(status_code=404, detail="Timbangan tidak ditemukan")
     ok = instance.tare()
-    return {"status": "success" if ok else "error", "message": "Perintah Tare dikirim"}
+    return {"status": "success" if ok else "error", "message": f"Perintah Tare dikirim ke {instance.name} ({instance.port})", "ok": ok}
 
 @router.get("/ports")
 def get_ports_list():
@@ -440,18 +444,20 @@ def scale_custom_command(req: ScaleCommandRequest):
     return {"status": "success" if ok else "error", "command": req.command, "ok": ok}
 
 @router.post("/scale/pause")
-def scale_pause(scale: Optional[str] = Query(None), seconds: Optional[int] = Query(None)):
+def scale_pause(scale: Optional[str] = Query(None), port: Optional[str] = Query(None), seconds: Optional[int] = Query(None)):
     """Melepas port serial untuk dipakai software lain (misal Delphi)."""
-    instance = scale_manager.get_scale(scale)
+    target = scale or port
+    instance = scale_manager.get_scale(target)
     if not instance:
         raise HTTPException(status_code=404, detail="Timbangan tidak ditemukan")
     instance.pause(seconds=seconds)
-    return {"status": "success", "message": f"Port dilepas ({instance.state})"}
+    return {"status": "success", "message": f"Port {instance.port} dilepas ({instance.state})"}
 
 @router.post("/scale/resume")
-def scale_resume(scale: Optional[str] = Query(None)):
+def scale_resume(scale: Optional[str] = Query(None), port: Optional[str] = Query(None)):
     """Menyambungkan kembali timbangan yang sebelumnya di-pause."""
-    instance = scale_manager.get_scale(scale)
+    target = scale or port
+    instance = scale_manager.get_scale(target)
     if not instance:
         raise HTTPException(status_code=404, detail="Timbangan tidak ditemukan")
     instance.resume()
@@ -497,6 +503,10 @@ async def event_stream(request: Request):
 @router.get("/status")
 def get_system_status():
     """Informasi status bridge, sistem operasi, versi, dan konfigurasi."""
+    connected_scale_ports = [
+        f"{sc.port} ({sc.name})" if sc.name else sc.port
+        for sc in scale_manager.scales.values() if sc.connected and sc.port and sc.port.upper() != "SIM"
+    ]
     return {
         "status": "online",
         "app": "WebApp Hardware Bridge Universal",
@@ -506,7 +516,9 @@ def get_system_status():
         "python_version": sys.version,
         "default_printer": printer_manager.get_default_printer(),
         "total_printers": len(printer_manager.list_printers()),
-        "total_scales": len(scale_manager.scales)
+        "total_scales": len(scale_manager.scales),
+        "connected_scale_ports": connected_scale_ports,
+        "scales": scale_manager.get_all_status()
     }
 
 @router.get("/config")

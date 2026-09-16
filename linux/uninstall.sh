@@ -24,11 +24,14 @@ if [ -f "$USER_HOME/.config/autostart/hardware-bridge-tray.desktop" ]; then
     rm -f "$USER_HOME/.config/autostart/hardware-bridge-tray.desktop"
 fi
 
-echo "[3/4] Menghapus berkas service systemd..."
+echo "[3/4] Menghapus berkas service systemd & konfigurasi sudoers..."
 if [ -f "/etc/systemd/system/hardware-bridge.service" ]; then
     sudo rm -f "/etc/systemd/system/hardware-bridge.service"
     sudo systemctl daemon-reload
     sudo systemctl reset-failed 2>/dev/null || true
+fi
+if [ -f "/etc/sudoers.d/hardware-bridge" ]; then
+    sudo rm -f "/etc/sudoers.d/hardware-bridge"
 fi
 
 echo "[4/4] Menghapus aturan udev serial & printer..."

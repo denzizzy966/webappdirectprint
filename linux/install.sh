@@ -192,6 +192,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable hardware-bridge.service
 sudo systemctl restart hardware-bridge.service
 
+# Tambahkan aturan sudoers tanpa password untuk pengelolaan service hardware-bridge dari System Tray
+SUDOERS_FILE="/etc/sudoers.d/hardware-bridge"
+echo "$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart hardware-bridge, /usr/bin/systemctl stop hardware-bridge, /usr/bin/systemctl start hardware-bridge, /usr/bin/systemctl status hardware-bridge" | sudo tee "$SUDOERS_FILE" >/dev/null 2>&1 || true
+sudo chmod 0440 "$SUDOERS_FILE" 2>/dev/null || true
+
 # Pasang Desktop System Tray Autostart untuk sesi grafis (Linux Mint Cinnamon / Ubuntu)
 USER_HOME=$(getent passwd "$CURRENT_USER" | cut -d: -f6)
 if [ -z "$USER_HOME" ]; then
