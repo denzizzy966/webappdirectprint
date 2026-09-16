@@ -540,138 +540,358 @@
         </div>
       </div>
 
+      <!-- Interactive Demo Playground Banner -->
+      <div class="card" style="background: linear-gradient(135deg, rgba(30, 111, 217, 0.12), rgba(16, 185, 129, 0.08)); border: 1px solid rgba(56, 189, 248, 0.35); padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <span style="font-size: 2.2rem; line-height: 1;">🧪</span>
+          <div>
+            <h4 style="margin: 0 0 4px; font-size: 1.1rem; color: var(--primary);">Live Interactive Sandbox &amp; Playground</h4>
+            <p style="margin: 0; font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
+              Uji coba langsung semua fungsi timbangan (live ticker, 1-klik timbang ke input, modal pop-up, switch multi-timbangan) di halaman demo bawaan.
+            </p>
+          </div>
+        </div>
+        <a href="/static/cara-pakai.html" target="_blank" class="btn btn-primary" style="text-decoration: none; font-weight: 600; padding: 0.6rem 1.25rem; font-size: 0.88rem; box-shadow: 0 2px 8px rgba(30, 111, 217, 0.3);">
+          🌐 Buka Demo Interaktif Langsung ↗
+        </a>
+      </div>
+
       <!-- Panduan Interaktif Penggunaan & Kode Contoh -->
-      <div class="card">
-        <div class="card-title">📖 Panduan Penggunaan & Contoh Kode</div>
-
-        <!-- Section A: Web Biasa -->
-        <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--primary);">1. Penggunaan di Web Biasa (HTML / Vanilla JS / React / Vue)</h4>
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-          Cukup panggil tag <code>&lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;</code> di HTML Anda:
+      <div class="card" style="margin-bottom: 1.25rem;">
+        <div class="card-title">📖 Panduan Lengkap API Timbangan &amp; Contoh Kode</div>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.5;">
+          Hardware Bridge menyediakan library JavaScript klien (<code>hardware-bridge.js</code> / alias <code>TimbanganSvc</code>) yang <b>tanpa dependensi luar</b> dan kompatibel dengan semua framework (Vanilla JS, Laravel Blade, Vue, React, jQuery) serta <b>ERPNext / Frappe</b>. Selain itu, tersedia REST API dan WebSocket untuk pemanggilan dari backend atau cURL.
         </p>
-        <div style="position: relative;">
-          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem;" id="snippet-web"><code>&lt;!-- 1. Muat SDK dari Bridge Server Lokal --&gt;
+
+        <!-- SUB-SECTION 1: KAMUS FUNCTION JS SDK -->
+        <h4 style="margin-top: 1.25rem; margin-bottom: 0.65rem; color: var(--primary); display: flex; align-items: center; gap: 6px;">
+          <span>1. Kamus Fungsi JavaScript SDK (<code>HardwareBridge</code> / <code>TimbanganSvc</code>)</span>
+        </h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+          Muat script di HTML: <code>&lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;</code>. Berikut daftar fungsi yang dapat dipanggil:
+        </p>
+        <div style="overflow-x: auto; margin-bottom: 1.5rem;">
+          <table style="font-size: 0.84rem;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.04);">
+                <th style="width: 28%;">Nama Function</th>
+                <th style="width: 32%;">Parameter &amp; Opsi</th>
+                <th style="width: 40%;">Kegunaan &amp; Nilai Kembalian</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>HardwareBridge.timbangKeInput(target, opts)</code></td>
+                <td>
+                  <b>target:</b> Selector CSS / elemen (misal <code>'#berat'</code>)<br>
+                  <b>opts:</b> <code>{ scale, stable_timeout, decimals, to_gram, alerts, allow_zero }</code>
+                </td>
+                <td>
+                  <b>(Sangat Populer)</b> Mengunci berat <b>STABIL</b> lalu otomatis mengisi nilai ke elemen <code>&lt;input&gt;</code>. Memancarkan event <code>input</code> &amp; <code>change</code> (bubbles) sehingga langsung terdeteksi oleh <b>Livewire (wire:model)</b>, <b>Vue (v-model)</b>, dan <b>React</b>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.liveWeight(target, opts)</code></td>
+                <td>
+                  <b>target:</b> Selector CSS / elemen teks<br>
+                  <b>opts:</b> <code>{ scale, interval, decimals, suffix, to_gram, onUpdate }</code>
+                </td>
+                <td>
+                  Menampilkan angka berat real-time yang terus berubah mengikuti pergerakan timbangan. Mengembalikan fungsi <code>stop()</code> untuk menghentikan interval.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.stableRead(scale, timeoutS)</code></td>
+                <td>
+                  <b>scale:</b> Nama/port timbangan (atau <code>null</code> untuk auto)<br>
+                  <b>timeoutS:</b> Batas waktu tunggu stabil dalam detik (default: <code>10</code>)
+                </td>
+                <td>
+                  <b>Promise async:</b> Menunggu timbangan menghasilkan data yang STABIL. Mengembalikan object: <code>{ ok: true, weight: 125.4, unit: 'g', stable: true, elapsed_seconds: 1.2 }</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.getWeight(scale)</code></td>
+                <td>
+                  <b>scale:</b> Nama timbangan (misal <code>'Shinko 1'</code>, <code>'/dev/ttyUSB0'</code>, atau <code>null</code>)
+                </td>
+                <td>
+                  Mengambil berat terkini secara instan (non-blocking). Mengembalikan object: <code>{ status: 'success', weight: 125.4, unit: 'g', stable: true, age: 0.1 }</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.listScales()</code></td>
+                <td><i>Tanpa parameter</i></td>
+                <td>
+                  Mengambil daftar seluruh timbangan yang terdaftar di bridge beserta status online/offline-nya dalam bentuk array JSON.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.pickScale(preferred)</code></td>
+                <td>
+                  <b>preferred:</b> Nama / port / substring pencocokan
+                </td>
+                <td>
+                  Algoritma cerdas untuk memilih timbangan aktif. Jika preferred kosong, otomatis memilih timbangan fisik pertama yang tersambung (bukan virtual SIM).
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.populateScaleSelect(sel, opts)</code></td>
+                <td>
+                  <b>sel:</b> Selector elemen <code>&lt;select&gt;</code><br>
+                  <b>opts:</b> <code>{ selected, onChange }</code>
+                </td>
+                <td>
+                  Mengisi elemen dropdown <code>&lt;select&gt;</code> dengan daftar timbangan aktif secara otomatis. Sangat praktis jika di meja kasir terdapat <b>2 timbangan</b>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.timbangDialog(onUse, opts)</code></td>
+                <td>
+                  <b>onUse:</b> <code>function(gram, unit, scale)</code><br>
+                  <b>opts:</b> <code>{ scale, title }</code>
+                </td>
+                <td>
+                  Menampilkan pop-up modal interaktif mandiri yang menampilkan live weight, status stabil, tombol "Gunakan Berat", dan dropdown multi-timbangan jika ada 2 timbangan.
+                </td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.zero(scale)</code></td>
+                <td><b>scale:</b> Nama/port timbangan (opsional)</td>
+                <td>Mengirim perintah <b>Zero (0.00)</b> ke sensor timbangan.</td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.tare(scale)</code></td>
+                <td><b>scale:</b> Nama/port timbangan (opsional)</td>
+                <td>Mengirim perintah <b>Tare (Wadah/Tara)</b> ke sensor timbangan.</td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.attachIndicator(target)</code></td>
+                <td><b>target:</b> Selector badge (misal <code>'#status-timbangan'</code>)</td>
+                <td>Menampilkan status koneksi 🟢 Online, 🟡 Sim, atau 🔴 Offline secara periodik otomatis.</td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.pause(scale, sec)</code></td>
+                <td><b>scale:</b> Nama/port, <b>sec:</b> durasi detik (default 30)</td>
+                <td>Melepas port serial sementara agar dapat dibuka oleh aplikasi lain (misal Delphi atau Chrome Web Serial).</td>
+              </tr>
+              <tr>
+                <td><code>HardwareBridge.resume(scale)</code></td>
+                <td><b>scale:</b> Nama/port timbangan</td>
+                <td>Mengambil alih dan menyambungkan kembali port serial setelah dipakai software lain.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- SUB-SECTION 2: CONTOH PENGGUNAAN UNIVERSAL WEB -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">2. Contoh Kode Universal Web (HTML / Vanilla JS / Laravel / Vue / React)</h4>
+        
+        <!-- Contoh A: Timbang ke Input -->
+        <div style="margin-bottom: 1.25rem;">
+          <b style="font-size: 0.92rem; color: #38bdf8;">Contoh A: 1-Klik Timbang ke Form Input (Laravel Blade / Livewire / Vue / React)</b>
+          <p style="font-size: 0.84rem; color: var(--text-muted); margin: 4px 0 8px;">
+            Operator menekan tombol "⚖️ Ambil Berat", bridge akan menunggu pembacaan stabil dan otomatis menuliskan angka ke <code>&lt;input id="berat"&gt;</code>:
+          </p>
+          <div style="position: relative;">
+            <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem;" id="snip-univ-input"><code>&lt;!-- Input dan Tombol Timbang --&gt;
+&lt;div style="display: flex; gap: 8px;"&gt;
+  &lt;input type="number" id="berat" name="berat" step="0.01" placeholder="0.00"&gt;
+  &lt;button type="button" class="btn btn-primary" onclick="ambilBerat()"&gt;⚖️ Ambil Berat&lt;/button&gt;
+&lt;/div&gt;
+
 &lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;
-
 &lt;script&gt;
-async function initBridge() {
-  const bridge = new HardwareBridge({ port: 18212 });
-  await bridge.connect();
+async function ambilBerat() {
+  // timbangKeInput otomatis menunggu nilai STABIL dan menembakkan event input/change
+  const hasil = await HardwareBridge.timbangKeInput('#berat', {
+    scale: 'Shinko 1',   // Bisa spesifik 'Shinko 1', 'COM3', atau null (otomatis)
+    stable_timeout: 6,    // Maksimal tunggu 6 detik
+    decimals: 2,          // 2 digit desimal (misal 12.50)
+    alerts: true          // Tampilkan notifikasi toast progres & sukses
+  });
 
-  // A. Ambil daftar printer yang terdeteksi
-  const printerList = await bridge.getPrinters();
-  console.log("Printer terdeteksi:", printerList.printers);
+  if (hasil) {
+    console.log('Berat berhasil dimasukkan:', hasil, 'gram');
+  }
+}
+&lt;/script&gt;</code></pre>
+            <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snip-univ-input')">📋 Salin</button>
+          </div>
+        </div>
 
-  // B. Silent Print Struk Thermal (ESC/POS)
-  const rawReceipt = "\x1b\x40\x1b\x61\x01TOKO KITA\n----------------\n1x Kopi   Rp 25.000\n----------------\n\n\x1dV\x42\x00";
-  await bridge.printRaw("EPSON TM-T82", rawReceipt);
+        <!-- Contoh B: Multi-Timbangan -->
+        <div style="margin-bottom: 1.25rem;">
+          <b style="font-size: 0.92rem; color: #38bdf8;">Contoh B: Menangani 2 Timbangan Sekaligus (Shinko 1 vs Shinko 2)</b>
+          <p style="font-size: 0.84rem; color: var(--text-muted); margin: 4px 0 8px;">
+            Jika di meja kasir/gudang terpasang 2 timbangan (misal Timbangan Gram &amp; Timbangan Koli), buat dropdown pemilih timbangan secara otomatis:
+          </p>
+          <div style="position: relative;">
+            <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem;" id="snip-univ-multi"><code>&lt;!-- Dropdown Pemilih Timbangan Aktif --&gt;
+&lt;label&gt;Pilih Timbangan:&lt;/label&gt;
+&lt;select id="pilihTimbangan"&gt;&lt;/select&gt;
 
-  // C. Silent Print PDF (Faktur / Invoice)
-  await bridge.printPdf("Printer Kantor", "http://127.0.0.1:8088/api/invoice/INV-001.pdf");
+&lt;input type="number" id="inputGram" placeholder="Berat..."&gt;
+&lt;button onclick="timbangDariPilihan()"&gt;⚖️ Timbang&lt;/button&gt;
 
-  // D. Baca Bobot Timbangan Digital (Real-Time)
-  const result = await bridge.getWeight();
-  console.log("Berat saat ini:", result.weight, result.unit, "Stabil:", result.stable);
+&lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+// 1. Isi dropdown secara otomatis saat halaman dimuat
+HardwareBridge.populateScaleSelect('#pilihTimbangan', {
+  onChange: (timbanganTerpilih) => {
+    console.log('Timbangan aktif beralih ke:', timbanganTerpilih);
+  }
+});
 
-  // E. Buka Laci Kasir (Cash Drawer Kick)
-  await bridge.openCashDrawer();
-
-  // F. Dengarkan stream perubahan berat secara reactive
-  bridge.onWeightChange((scales) => {
-    const scale = scales[0];
-    document.getElementById("tampilan-berat").innerText = `${scale.weight} ${scale.unit}`;
+// 2. Baca dari timbangan yang sedang dipilih di dropdown
+async function timbangDariPilihan() {
+  const targetScale = document.getElementById('pilihTimbangan').value;
+  await HardwareBridge.timbangKeInput('#inputGram', {
+    scale: targetScale, // 'Shinko 1' atau 'Shinko 2'
+    alerts: true
   });
 }
-initBridge();
 &lt;/script&gt;</code></pre>
-          <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-web')">📋 Salin</button>
+            <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snip-univ-multi')">📋 Salin</button>
+          </div>
         </div>
 
-        <!-- Section B: ERPNext Client Script -->
-        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">2. Cara Pasang di ERPNext (Client Script)</h4>
-        <ol style="margin-left: 1.5rem; font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.6;">
-          <li>Buka Desk ERPNext Anda (sebagai Administrator / System Manager).</li>
-          <li>Di Search Bar atas, ketik <b>Client Script</b> lalu tekan Enter.</li>
-          <li>Klik <b>+ Add Client Script</b>.</li>
-          <li>Set <b>DocType</b> ke <code>POS Invoice</code> atau <code>Sales Invoice</code>.</li>
-          <li>Set <b>Apply To</b> ke <code>Form</code> dan centang <b>Enabled</b>.</li>
-          <li>Salin kode berikut ke kolom <b>Script</b> dan klik <b>Save</b>:</li>
-        </ol>
-        <div style="position: relative;">
-          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; max-height: 350px;" id="snippet-erpnext"><code>frappe.ui.form.on('POS Invoice', {
-    refresh: function(frm) {
-        if (!frm.is_new()) {
-            // Tombol Direct Print Struk
-            frm.add_custom_button(__('🖨️ Cetak Struk (Direct Print)'), function() {
-                frappe.show_alert({ message: __('Mengirim ke printer kasir...'), indicator: 'blue' });
+        <!-- Contoh C: Live Display Ticker -->
+        <div style="margin-bottom: 1.25rem;">
+          <b style="font-size: 0.92rem; color: #38bdf8;">Contoh C: Ticker Tampilan Berat Live Real-Time</b>
+          <div style="position: relative;">
+            <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem;" id="snip-univ-live"><code>&lt;div style="background: #000; color: #10b981; font-family: monospace; font-size: 2rem; padding: 10px;" id="layar-live"&gt;
+  --.-- g
+&lt;/div&gt;
 
-                // Format ESC/POS
-                let receipt = "\x1b\x40\x1b\x61\x01\x1d\x21\x11" + (frm.doc.company || 'STRUK KASIR') + "\n\x1d\x21\x00";
-                receipt += "----------------------------------------\n\x1b\x61\x00";
-                receipt += "No Inv : " + frm.doc.name + "\n";
-                receipt += "Waktu  : " + frm.doc.posting_date + "\n========================================\n";
+&lt;script src="http://127.0.0.1:18212/static/js/hardware-bridge.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+// Ticker otomatis refresh setiap 300ms
+const stopTicker = HardwareBridge.liveWeight('#layar-live', {
+  scale: 'Shinko 1',
+  interval: 300,
+  suffix: ' g'
+});
 
-                (frm.doc.items || []).forEach(item => {
-                    receipt += `${item.qty}x ${item.item_name} - ${format_currency(item.amount, frm.doc.currency)}\n`;
-                });
-
-                receipt += "----------------------------------------\n\x1b\x61\x02";
-                receipt += "TOTAL: " + format_currency(frm.doc.grand_total, frm.doc.currency) + "\n\x1b\x61\x01";
-                receipt += "Terima Kasih!\n\n\n\x1d\x56\x42\x00";
-
-                // Kirim ke Bridge lokal di PC Kasir
-                fetch('http://127.0.0.1:18212/api/print/raw', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ data: receipt, doc_name: frm.doc.name })
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.status === 'success') frappe.show_alert({ message: __('Struk berhasil dicetak!'), indicator: 'green' });
-                    else frappe.msgprint(__('Gagal mencetak: ' + res.detail));
-                })
-                .catch(() => frappe.msgprint(__('Hardware Bridge tidak aktif di http://127.0.0.1:18212')));
-            }, __('Aksi Cepat'));
-
-            // Tombol Buka Laci Kasir
-            frm.add_custom_button(__('💵 Buka Laci Kasir'), function() {
-                fetch('http://127.0.0.1:18212/api/cashdrawer/open', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ pin: 2 })
-                }).then(() => frappe.show_alert({ message: __('Laci kasir terbuka!'), indicator: 'green' }));
-            }, __('Aksi Cepat'));
-        }
-
-        // Tombol Baca Timbangan
-        frm.add_custom_button(__('⚖️ Timbang Item Aktif'), function() {
-            frappe.show_alert({ message: __('Menimbang... Harap tunggu stabil'), indicator: 'blue' });
-            fetch('http://127.0.0.1:18212/api/scale/stable-read?timeout=4.0', { method: 'POST' })
-                .then(r => r.json())
-                .then(res => {
-                    if (res.status === 'success') {
-                        frappe.msgprint({
-                            title: __('Hasil Timbangan'),
-                            indicator: 'green',
-                            message: `Berat: <b>${res.data.weight} ${res.data.unit}</b> (Stabil)`
-                        });
-                    } else {
-                        frappe.msgprint(__('Timbangan belum stabil: ' + res.message));
-                    }
-                });
-        }, __('Aksi Cepat'));
-    }
-});</code></pre>
-          <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-erpnext')">📋 Salin</button>
+// Panggil stopTicker() jika ingin menghentikan pembacaan
+&lt;/script&gt;</code></pre>
+            <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snip-univ-live')">📋 Salin</button>
+          </div>
         </div>
 
-        <!-- Section C: POS Auto-Print Hook -->
-        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">3. Hook POS Checkout Otomatis (POS Awesome & ERPNext POS)</h4>
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-          Script ini mendengarkan event submit POS invoice untuk langsung mencetak struk dan menendang laci uang saat kasir selesai memproses pembayaran:
+        <!-- SUB-SECTION 3: PANDUAN LENGKAP ERPNEXT -->
+        <h4 style="margin-top: 1.75rem; margin-bottom: 0.5rem; color: var(--primary);">3. Cara Pasang di ERPNext (Client Script Form &amp; Child Table)</h4>
+        <p style="font-size: 0.86rem; color: var(--text-muted); margin-bottom: 0.75rem; line-height: 1.5;">
+          Di ERPNext, Anda dapat menggunakan <b>Client Script</b> pada DocType apapun (misal <code>POS Invoice</code>, <code>Sales Invoice</code>, <code>Purchase Receipt</code>, atau <code>Stock Entry</code>).
         </p>
-        <div style="position: relative;">
-          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; max-height: 250px;" id="snippet-pos"><code>$(document).on('pos_invoice_submitted', function(event, invoice_doc) {
+
+        <!-- ERPNext Kasus 1: Timbang Baris Child Table Item -->
+        <div style="margin-bottom: 1.25rem;">
+          <b style="font-size: 0.92rem; color: #38bdf8;">Kasus 1: Tombol Timbang Otomatis pada Baris Tabel Barang (Child Table <code>items</code>)</b>
+          <p style="font-size: 0.84rem; color: var(--text-muted); margin: 4px 0 8px;">
+            Operator menimbang barang, klik tombol timbang di baris item, berat stabil langsung masuk ke kolom <code>qty</code> atau <code>custom_berat</code>:
+          </p>
+          <div style="position: relative;">
+            <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem; max-height: 380px;" id="snippet-erpnext"><code>// Target DocType: POS Invoice (atau Purchase Receipt / Stock Entry)
+const BRIDGE_URL = 'http://127.0.0.1:18212';
+
+// 1. Tombol di Header Form
+frappe.ui.form.on('POS Invoice', {
+    refresh: function(frm) {
+        // Tombol Ambil Berat Form Header
+        frm.add_custom_button(__('⚖️ Timbang Item Aktif'), function() {
+            ambilBeratTimbangan(frm);
+        }, __('Aksi Timbangan'));
+
+        // Tombol Zero (0.00)
+        frm.add_custom_button(__('0️⃣ Zero Timbangan'), function() {
+            fetch(`${BRIDGE_URL}/api/scale/zero`, { method: 'POST' })
+                .then(() => frappe.show_alert({ message: __('Timbangan di-Zero (0.00)'), indicator: 'green' }));
+        }, __('Aksi Timbangan'));
+
+        // Tombol Tare (Wadah)
+        frm.add_custom_button(__('⚖️ Tare (Wadah)'), function() {
+            fetch(`${BRIDGE_URL}/api/scale/tare`, { method: 'POST' })
+                .then(() => frappe.show_alert({ message: __('Timbangan di-Tare'), indicator: 'green' }));
+        }, __('Aksi Timbangan'));
+    }
+});
+
+// 2. Tombol di Baris Child Table (Item)
+frappe.ui.form.on('POS Invoice Item', {
+    // Dipicu jika Anda membuat Custom Field bertipe Button dengan fieldname 'btn_timbang' di child table
+    btn_timbang: function(frm, cdt, cdn) {
+        frappe.show_alert({ message: __('Menunggu berat stabil...'), indicator: 'blue' });
+
+        // Panggil endpoint stable-read bridge
+        fetch(`${BRIDGE_URL}/api/scale/stable-read?timeout=5.0`, { method: 'POST' })
+            .then(res => res.json())
+            .then(res => {
+                if (res.status === 'success' || res.ok) {
+                    const berat = Number(res.data.weight);
+                    // Masukkan berat ke kolom Qty baris item saat ini
+                    frappe.model.set_value(cdt, cdn, 'qty', berat);
+                    frappe.show_alert({
+                        message: `✅ Berat Terkunci: <b>${berat} ${res.data.unit}</b>`,
+                        indicator: 'green'
+                    });
+                } else {
+                    frappe.msgprint(__('Timbangan belum stabil: ') + (res.message || res.error));
+                }
+            })
+            .catch(() => {
+                frappe.msgprint(__('Gagal menghubungi Hardware Bridge di ') + BRIDGE_URL);
+            });
+    }
+});
+
+function ambilBeratTimbangan(frm) {
+    frappe.show_alert({ message: __('Membaca timbangan... Harap tunggu stabil'), indicator: 'blue' });
+    fetch(`${BRIDGE_URL}/api/scale/stable-read?timeout=5.0`, { method: 'POST' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.status === 'success' || res.ok) {
+                frappe.msgprint({
+                    title: __('Hasil Pembacaan Timbangan'),
+                    indicator: 'green',
+                    message: `Berat: &lt;b style="font-size: 1.3rem; color: #10b981;"&gt;${res.data.weight} ${res.data.unit}&lt;/b&gt;&lt;br&gt;Timbangan: &lt;b&gt;${res.data.name}&lt;/b&gt; (${res.data.port})`
+                });
+            } else {
+                frappe.msgprint(__('Timbangan belum stabil: ') + res.message);
+            }
+        });
+}</code></pre>
+            <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-erpnext')">📋 Salin</button>
+          </div>
+        </div>
+
+        <!-- ERPNext Kasus 2: Multi-Timbangan di ERPNext -->
+        <div style="margin-bottom: 1.25rem;">
+          <b style="font-size: 0.92rem; color: #38bdf8;">Kasus 2: Memilih Antara 2 Timbangan (Shinko 1 vs Shinko 2) di ERPNext</b>
+          <p style="font-size: 0.84rem; color: var(--text-muted); margin: 4px 0 8px;">
+            Gunakan parameter <code>scale</code> pada URL untuk mengarahkan pembacaan ke timbangan tertentu:
+          </p>
+          <div style="position: relative;">
+            <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem;" id="snip-erp-multi"><code>// Membaca Timbangan Gram (Shinko 1)
+fetch('http://127.0.0.1:18212/api/scale/stable-read?scale=Shinko%201&timeout=4.0', { method: 'POST' })
+    .then(r => r.json())
+    .then(res => console.log('Shinko 1:', res.data.weight));
+
+// Membaca Timbangan Koli (Shinko 2)
+fetch('http://127.0.0.1:18212/api/scale/stable-read?scale=Shinko%202&timeout=4.0', { method: 'POST' })
+    .then(r => r.json())
+    .then(res => console.log('Shinko 2:', res.data.weight));</code></pre>
+            <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snip-erp-multi')">📋 Salin</button>
+          </div>
+        </div>
+
+        <!-- SUB-SECTION 4: POS AUTO-PRINT & DRAWER -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">4. Hook POS Checkout Otomatis (POS Awesome &amp; ERPNext POS)</h4>
+        <p style="font-size: 0.86rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+          Script ini mendengarkan event submit POS invoice untuk langsung mencetak struk thermal dan menendang laci uang saat kasir selesai memproses pembayaran:
+        </p>
+        <div style="position: relative; margin-bottom: 1.5rem;">
+          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem; max-height: 250px;" id="snippet-pos"><code>$(document).on('pos_invoice_submitted', function(event, invoice_doc) {
     if (!invoice_doc) return;
 
     // 1. Buka laci kasir otomatis
@@ -706,30 +926,89 @@ initBridge();
           <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-pos')">📋 Salin</button>
         </div>
 
-        <!-- Section D: REST API & cURL -->
-        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">4. Penggunaan via REST API (cURL / Backend Python / PHP / C#)</h4>
-        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-          Anda juga dapat memanggil bridge dari script command line, backend lokal, atau desktop app:
-        </p>
+        <!-- SUB-SECTION 5: REST API & CURL -->
+        <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--primary);">5. Kamus REST API &amp; cURL (Untuk Backend Python / PHP / C# / Postman)</h4>
+        <div style="overflow-x: auto; margin-bottom: 1rem;">
+          <table style="font-size: 0.84rem;">
+            <thead>
+              <tr style="background: rgba(255,255,255,0.04);">
+                <th style="width: 10%;">Method</th>
+                <th style="width: 30%;">Endpoint</th>
+                <th style="width: 25%;">Parameter</th>
+                <th style="width: 35%;">Deskripsi</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge badge-primary">GET</span></td>
+                <td><code>/api/scales</code></td>
+                <td><i>none</i></td>
+                <td>Daftar seluruh timbangan beserta status koneksi, baudrate, dan port.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-primary">GET</span></td>
+                <td><code>/api/weight</code></td>
+                <td><code>?scale=Shinko%201</code></td>
+                <td>Mengambil berat saat ini (instan, non-blocking). Format: <code>{ weight, unit, stable, age }</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-success">POST</span></td>
+                <td><code>/api/scale/stable-read</code></td>
+                <td><code>?scale=...&amp;timeout=5.0</code></td>
+                <td>Menunggu hingga berat STABIL terkunci. Mengembalikan <code>{ ok: true, weight, unit, elapsed_seconds }</code>.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-success">POST</span></td>
+                <td><code>/api/scale/zero</code></td>
+                <td><code>?scale=Shinko%201</code></td>
+                <td>Mengirim perintah Zero (0.00) ke timbangan.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-success">POST</span></td>
+                <td><code>/api/scale/tare</code></td>
+                <td><code>?scale=Shinko%201</code></td>
+                <td>Mengirim perintah Tare (Wadah) ke timbangan.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-success">POST</span></td>
+                <td><code>/api/scale/command</code></td>
+                <td>JSON: <code>{"scale":"...","command":"O9"}</code></td>
+                <td>Mengirim perintah serial mentah (raw command: O9, O8, SI, S, Z, dll).</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-warning">POST</span></td>
+                <td><code>/api/scale/pause</code></td>
+                <td><code>?scale=...&amp;seconds=30</code></td>
+                <td>Melepas port serial untuk dipakai Delphi atau software lain.</td>
+              </tr>
+              <tr>
+                <td><span class="badge badge-primary">GET</span></td>
+                <td><code>/api/stream</code></td>
+                <td><i>none</i></td>
+                <td>Stream SSE (Server-Sent Events) untuk menerima berat real-time terus-menerus.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <div style="position: relative;">
-          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem;" id="snippet-curl"><code># 1. Ambil daftar printer
-curl -X GET http://127.0.0.1:18212/api/printers
+          <pre style="background: #020617; color: #f8fafc; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.84rem;" id="snippet-curl"><code># 1. Ambil daftar timbangan terdaftar
+curl -X GET http://127.0.0.1:18212/api/scales
 
-# 2. Cetak RAW teks / ESC/POS
-curl -X POST http://127.0.0.1:18212/api/print/raw \
+# 2. Ambil berat instan dari Shinko 1
+curl -X GET "http://127.0.0.1:18212/api/weight?scale=Shinko%201"
+
+# 3. Tunggu berat stabil (timeout 5 detik)
+curl -X POST "http://127.0.0.1:18212/api/scale/stable-read?scale=Shinko%201&timeout=5.0"
+
+# 4. Kirim Zero & Tare
+curl -X POST "http://127.0.0.1:18212/api/scale/zero?scale=Shinko%201"
+curl -X POST "http://127.0.0.1:18212/api/scale/tare?scale=Shinko%201"
+
+# 5. Kirim perintah manual (misal O9 untuk Shinko)
+curl -X POST http://127.0.0.1:18212/api/scale/command \
   -H "Content-Type: application/json" \
-  -d '{"printer": "Godex G500 GZPL", "data": "Halo Dunia Kasir!\n\n\n"}'
-
-# 3. Cetak PDF Silent
-curl -X POST http://127.0.0.1:18212/api/print/pdf \
-  -H "Content-Type: application/json" \
-  -d '{"pdf_data": "http://127.0.0.1:8088/api/invoice/INV-001.pdf"}'
-
-# 4. Ambil Berat Timbangan
-curl -X GET http://127.0.0.1:18212/api/weight
-
-# 5. Buka Laci Kasir
-curl -X POST http://127.0.0.1:18212/api/cashdrawer/open -H "Content-Type: application/json" -d '{"pin": 2}'</code></pre>
+  -d '{"scale": "Shinko 1", "command": "O9"}'</code></pre>
           <button class="btn btn-secondary" style="position: absolute; top: 0.5rem; right: 0.5rem; padding: 0.3rem 0.6rem; font-size: 0.75rem;" onclick="copyCodeSnippet('snippet-curl')">📋 Salin</button>
         </div>
       </div>

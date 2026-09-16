@@ -27,34 +27,44 @@ frappe.ui.form.on('POS Invoice', {
         }
 
         // ────────────────────────────────────────────────────────────
-        // 2. Tombol Ambil Berat Timbangan Digital
+        // 2. Tombol Ambil Berat Timbangan Digital & Kontrol
         // ────────────────────────────────────────────────────────────
         frm.add_custom_button(__('⚖️ Timbang Item Aktif'), function () {
             fetchScaleWeight(frm);
-        }, __('Aksi Cepat'));
+        }, __('Aksi Timbangan'));
+
+        frm.add_custom_button(__('0️⃣ Zero (Nol)'), function () {
+            zeroScale();
+        }, __('Aksi Timbangan'));
+
+        frm.add_custom_button(__('⚖️ Tare (Wadah)'), function () {
+            tareScale();
+        }, __('Aksi Timbangan'));
     }
 });
 
-// Handler untuk child table Item pada POS Invoice / Sales Invoice
+// Handler untuk child table Item pada POS Invoice / Sales Invoice / Purchase Receipt / Stock Entry
 frappe.ui.form.on('POS Invoice Item', {
     items_add: function (frm, cdt, cdn) {
         // Otomatis tawarkan timbang jika item memerlukan berat
     },
-    custom_btn_timbang: function (frm, cdt, cdn) {
-        const row = locals[cdt][cdn];
-        frappe.show_alert({ message: __('Membaca timbangan...'), indicator: 'blue' });
+    // Dipanggil jika Anda menambahkan custom button pada child table row dengan fieldname 'btn_timbang'
+    btn_timbang: function (frm, cdt, cdn) {
+        frappe.show_alert({ message: __('Menunggu berat stabil...'), indicator: 'blue' });
         
-        fetch(`${BRIDGE_URL}/api/scale/stable-read?timeout=4.0`, { method: 'POST' })
+        // Panggil endpoint stable-read (bisa tentukan nama timbangan spesifik misal scale=Shinko%201)
+        fetch(`${BRIDGE_URL}/api/scale/stable-read?timeout=5.0`, { method: 'POST' })
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'success') {
-                    frappe.model.set_value(cdt, cdn, 'qty', data.data.weight);
+                if (data.status === 'success' || data.ok) {
+                    const weightVal = Number(data.data.weight);
+                    frappe.model.set_value(cdt, cdn, 'qty', weightVal);
                     frappe.show_alert({
-                        message: __('Berat terkunci: {0} {1}', [data.data.weight, data.data.unit]),
+                        message: __('Berat terkunci: <b>{0} {1}</b> ({2})', [weightVal, data.data.unit, data.data.name]),
                         indicator: 'green'
                     });
                 } else {
-                    frappe.msgprint(__('Timbangan belum stabil: {0}', [data.message]));
+                    frappe.msgprint(__('Timbangan belum stabil: {0}', [data.message || data.error]));
                 }
             })
             .catch(err => {
@@ -147,24 +157,77 @@ function openCashDrawer() {
 }
 
 /**
- * Membaca berat timbangan dan mengisi field form
+ * Membaca berat timbangan dan mengisi field form (bisa tentukan scaleName dan targetField)
  */
-function fetchScaleWeight(frm) {
+function fetchScaleWeight(frm, scaleName = null, targetField = null) {
     frappe.show_alert({ message: __('Menimbang... Harap tunggu stabil'), indicator: 'blue' });
-    fetch(`${BRIDGE_URL}/api/scale/stable-read?timeout=4.0`, { method: 'POST' })
+    const url = scaleName 
+        ? `${BRIDGE_URL}/api/scale/stable-read?scale=${encodeURIComponent(scaleName)}&timeout=5.0`
+        : `${BRIDGE_URL}/api/scale/stable-read?timeout=5.0`;
+
+    fetch(url, { method: 'POST' })
         .then(res => res.json())
         .then(data => {
-            if (data.status === 'success') {
+            if (data.status === 'success' || data.ok) {
+                const weight = data.data.weight;
+                const unit = data.data.unit || 'g';
+                const name = data.data.name || 'Timbangan';
+                
+                if (targetField) {
+                    frm.set_value(targetField, weight);
+                }
+
                 frappe.msgprint({
                     title: __('Hasil Timbangan'),
                     indicator: 'green',
-                    message: `<b>Berat:</b> ${data.data.weight} ${data.data.unit}<br><b>Status:</b> Stabil (${data.elapsed_seconds} detik)`
+                    message: `<div style="text-align: center; padding: 10px;">
+                        <span style="font-size: 2.2rem; font-weight: 800; color: #10b981; font-family: monospace;">${weight} ${unit}</span>
+                        <br><small style="color: #666;">Timbangan: <b>${name}</b> (${data.data.port}) • Stabil dalam ${data.elapsed_seconds}s</small>
+                    </div>`
                 });
             } else {
-                frappe.msgprint(__('Timbangan belum stabil: {0}', [data.message]));
+                frappe.msgprint(__('Timbangan belum stabil: {0}', [data.message || data.error]));
             }
         })
         .catch(err => {
             frappe.msgprint(__('Hardware Bridge tidak terdeteksi di {0}', [BRIDGE_URL]));
+        });
+}
+
+/**
+ * Mengirim perintah Zero (0.00) ke timbangan
+ */
+function zeroScale(scaleName = null) {
+    const url = scaleName 
+        ? `${BRIDGE_URL}/api/scale/zero?scale=${encodeURIComponent(scaleName)}`
+        : `${BRIDGE_URL}/api/scale/zero`;
+
+    fetch(url, { method: 'POST' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.status === 'success' || res.ok) {
+                frappe.show_alert({ message: __('Perintah Zero berhasil dikirim'), indicator: 'green' });
+            } else {
+                frappe.msgprint(__('Gagal Zero: ') + (res.message || 'Error'));
+            }
+        });
+}
+
+/**
+ * Mengirim perintah Tare (Wadah) ke timbangan
+ */
+function tareScale(scaleName = null) {
+    const url = scaleName 
+        ? `${BRIDGE_URL}/api/scale/tare?scale=${encodeURIComponent(scaleName)}`
+        : `${BRIDGE_URL}/api/scale/tare`;
+
+    fetch(url, { method: 'POST' })
+        .then(r => r.json())
+        .then(res => {
+            if (res.status === 'success' || res.ok) {
+                frappe.show_alert({ message: __('Perintah Tare berhasil dikirim'), indicator: 'green' });
+            } else {
+                frappe.msgprint(__('Gagal Tare: ') + (res.message || 'Error'));
+            }
         });
 }
