@@ -383,3 +383,36 @@ Jika Hardware Bridge sedang berjalan di PC Anda, halaman tersebut dapat langsung
 
 Akses via URL web server bridge:
 👉 **`http://127.0.0.1:18212/static/cara-pakai.html`**
+
+---
+
+## 9. Console Interaktif & Diagnostic Timbangan (Dashboard Bridge)
+
+Pada antarmuka Web UI Hardware Bridge (`http://127.0.0.1:18212` tab **Timbangan Digital**), terdapat console diagnostic lengkap yang memudahkan teknisi dan developer menguji timbangan:
+
+### 1. Mode Simulator (`SIM`) — Uji Coba Tanpa Hardware Fisik
+- Pada dropdown **Port**, pilih **`SIM — Simulator Mode (mock data)`**.
+- Klik **Connect**.
+- Bridge akan langsung menyimulasikan aliran data timbangan secara real-time (`S S 123.45 g`).
+- Cocok digunakan saat development di laptop yang tidak terhubung ke timbangan fisik RS232/COM.
+
+### 2. Pilihan Protokol & Presets
+- **Mettler MT-SICS:** Preset Baud `9600`, Frame `8/None`. Tombol cepat: Zero (`Z`), Tare (`T`), Baca Stabil (`S`), Baca Langsung (`SI`), Start Continuous (`SIR`), Stop (`@`).
+- **Shinko / ViBRA:** Preset Baud `9600`, Frame `8/None`. Tombol cepat: Zero (`Z`), Tare (`T`), Baca Stabil (`O8`), Baca Langsung (`O9`), Start Continuous (`O1`), Stop (`O0`).
+- **A&D:** Preset Baud `2400`, Frame `7/Even`. Tombol cepat: Zero (`Z`), Tare (`T`), Baca Stabil (`S`), Baca Langsung (`Q`), Start Continuous (`SIR`), Stop (`C`).
+
+### 3. Pindai Baud Rate Otomatis (Scan Baud)
+- Jika Anda menghubungkan timbangan baru dan tidak mengetahui baud rate-nya, cukup pilih port COM timbangan lalu klik tombol **🔍 Scan Baud**.
+- Bridge akan otomatis menguji kecepatan `9600`, `4800`, `2400`, `1200`, dan `19200` hingga menemukan respons yang valid.
+
+### 4. Live Serial Monitor (Terminal RX/TX)
+- **Monitoring Lalu Lintas:** Menampilkan setiap byte data yang dikirim (**TX >**) dan diterima (**RX <**) secara transparan.
+- **Tampilkan Hex:** Centang kotak `tampilkan hex` untuk melihat representasi byte heksadesimal dari pesan serial.
+- **Autoscroll:** Menjaga terminal selalu bergeser ke baris pesan terbaru.
+- **Statistik:** Menampilkan total baris diterima, total byte, dan kecepatan transfer data (byte/detik).
+
+### 5. Tombol "Lepas Port" (Port Sharing untuk Delphi / Web Serial)
+- Klik tombol **⏸️ Lepas Port** untuk membebaskan port COM secara instan tanpa perlu mematikan bridge.
+- Port COM langsung dapat dibuka oleh aplikasi legacy (seperti Delphi) atau browser via Web Serial API.
+- Klik **▶️ Sambung Lagi** untuk menghubungkan kembali timbangan ke bridge.
+

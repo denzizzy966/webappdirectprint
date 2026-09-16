@@ -35,10 +35,20 @@
   },
   "scales": [
     {
-      "name": "Mettler JE5002GE / Shinko",
-      "port": "COM5",
-      "usb_serial": "BMCBE14A312",
-      "protocol": "auto",
+      "name": "Shinko 1",
+      "port": "/dev/ttyUSB0",
+      "protocol": "shinko",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "poll_interval": 0.5,
+      "autoconnect": true
+    },
+    {
+      "name": "Shinko 2",
+      "port": "/dev/ttyUSB1",
+      "protocol": "shinko",
       "baud": 9600,
       "databits": 8,
       "parity": "N",
@@ -49,7 +59,7 @@
     {
       "name": "Simulator Timbangan",
       "port": "SIM",
-      "protocol": "mettler",
+      "protocol": "shinko",
       "baud": 9600,
       "databits": 8,
       "parity": "N",

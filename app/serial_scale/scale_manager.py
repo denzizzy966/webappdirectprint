@@ -7,7 +7,7 @@ import sys
 import threading
 import time
 from collections import deque
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 
 import serial
 import serial.tools.list_ports
@@ -60,12 +60,23 @@ class ScaleInstance:
         self._paused = threading.Event()
         self._threads: List[threading.Thread] = []
 
-        # Log lokal
-        self.log_history = deque(maxlen=200)
+        # Log lokal & metrics
+        self.log_history = deque(maxlen=300)
+        self._log_id = 0
+        self.rx_lines = 0
+        self.rx_bytes = 0
+        self.start_rx_ts = time.time()
 
-    def _log(self, direction: str, message: str):
+    def _log(self, direction: str, message: str, hex_data: str = ""):
+        self._log_id += 1
         ts = time.strftime("%H:%M:%S")
-        self.log_history.append({"ts": ts, "dir": direction, "msg": message})
+        self.log_history.append({
+            "id": self._log_id,
+            "ts": ts,
+            "dir": direction.lower(),
+            "text": message,
+            "hex": hex_data
+        })
         logger.info(f"[{self.name}] {direction}: {message}")
 
     def mark_api_activity(self):
@@ -95,19 +106,22 @@ class ScaleInstance:
                 except Exception:
                     pass
 
-    def _auto_resolve_port(self) -> bool:
-        """Deteksi otomatis jika port serial berpindah slot USB (misal COM5 -> COM1)."""
+    def _auto_resolve_port(self, claimed_ports: Optional[Set[str]] = None) -> bool:
+        """Deteksi otomatis jika port serial berpindah slot USB (misal COM5 -> COM1 atau /dev/ttyUSB0)."""
         try:
             present_ports = list(serial.tools.list_ports.comports())
             present_devices = {p.device for p in present_ports}
 
-            # 1. Jika port yang dikonfigurasi saat ini masih terpasang, tetap gunakan
+            # 1. Jika port yang dikonfigurasi saat ini masih terpasang dan belum diklaim timbangan lain
             if self.port and self.port in present_devices:
-                return True
+                if not claimed_ports or self.port not in claimed_ports:
+                    return True
 
-            # 2. Jika port lama hilang, cari berdasarkan USB Serial Number (e.g. BMCBE14A312)
+            # 2. Jika port lama hilang / bentrok, cari berdasarkan USB Serial Number (e.g. BMCBE14A312)
             if self.usb_serial:
                 for p in present_ports:
+                    if claimed_ports and p.device in claimed_ports:
+                        continue
                     sn = (p.serial_number or "").strip().upper()
                     hw = (p.hwid or "").strip().upper()
                     if self.usb_serial == sn or f"SER={self.usb_serial}" in hw:
@@ -115,11 +129,18 @@ class ScaleInstance:
                         self.port = p.device
                         return True
 
-            # 3. Fallback: Cari adapter USB Serial (Prolific PL2303, CH340, FTDI, CP210)
+            # 3. Fallback: Cari adapter USB Serial yang belum diklaim (Prolific PL2303, CH340, FTDI, CP210, /dev/ttyUSB*)
             for p in present_ports:
+                if claimed_ports and p.device in claimed_ports:
+                    continue
                 hw = (p.hwid or "").upper()
                 desc = (p.description or "").upper()
-                if "067B:23A3" in hw or "PL2303" in desc or "CH340" in desc or "FTDI" in desc or "CP210" in desc:
+                dev = p.device
+                if (
+                    "067B:23A3" in hw or "PL2303" in desc or "CH340" in desc or 
+                    "FTDI" in desc or "CP210" in desc or 
+                    dev.startswith("/dev/ttyUSB") or dev.startswith("/dev/ttyACM")
+                ):
                     logger.info(f"[{self.name}] Port otomatis mendeteksi adapter serial di '{p.device}' ({p.description})")
                     self.port = p.device
                     return True
@@ -182,7 +203,10 @@ class ScaleInstance:
             self._stop.clear()
             self._paused.clear()
 
-            self._auto_resolve_port()
+            claimed = set()
+            if 'scale_manager' in globals() and scale_manager:
+                claimed = scale_manager.get_claimed_ports(exclude=self)
+            self._auto_resolve_port(claimed_ports=claimed)
 
             self.ser = serial.Serial(
                 port=self.port,
@@ -293,16 +317,31 @@ class ScaleInstance:
         if not cmd:
             return False
 
+        cmd_clean = cmd.strip()
+        hex_cmd = cmd_clean.encode("latin1", errors="ignore").hex(" ")
+        self._log("tx", cmd_clean, hex_data=hex_cmd)
+
         if self.sim:
-            if cmd.strip().upper() in ('Z', 'ZERO'):
+            if cmd_clean.upper() in ('Z', 'ZERO'):
                 self.tare_offset = self.weight or 0.0
                 self.weight = 0.0
                 self.stable = True
+                self._log("rx", "Z A", hex_data="5a 20 41")
                 return True
-            if cmd.strip().upper() in ('T', 'TARE'):
+            if cmd_clean.upper() in ('T', 'TARE'):
                 self.tare_offset = self.weight or 0.0
                 self.weight = 0.0
                 self.stable = True
+                self._log("rx", "T A", hex_data="54 20 41")
+                return True
+            if cmd_clean.upper() in ('SI', 'O9', 'Q'):
+                ans = f"S S {self.weight:8.2f} g"
+                self._log("rx", ans, hex_data=ans.encode("latin1").hex(" "))
+                return True
+            if cmd_clean.upper() in ('S', 'O8'):
+                self.stable = True
+                ans = f"S S {self.weight:8.2f} g"
+                self._log("rx", ans, hex_data=ans.encode("latin1").hex(" "))
                 return True
             return True
 
@@ -312,10 +351,9 @@ class ScaleInstance:
             try:
                 data = cmd if cmd.endswith("\r\n") or cmd.endswith("\n") else cmd + "\r\n"
                 self.ser.write(data.encode("ascii", errors="ignore"))
-                self._log("TX", cmd.strip())
                 return True
             except Exception as e:
-                self._log("ERR", f"Gagal kirim command: {e}")
+                self._log("err", f"Gagal kirim command: {e}")
                 return False
 
     def zero(self) -> bool:
@@ -348,6 +386,35 @@ class ScaleInstance:
             "timestamp": self.last_update_ts,
             "age": age,
             "ok": self.connected and (age < 10.0 if not self.sim else True)
+        }
+
+    def get_state(self, since: int = 0) -> Dict[str, Any]:
+        data = self.get_data()
+        new_logs = [entry for entry in self.log_history if entry.get("id", 0) > since]
+        now = time.time()
+        elapsed = max(now - (self.start_rx_ts or now), 1.0)
+        bps = round(self.rx_bytes / elapsed, 1)
+        return {
+            "ok": True,
+            "connected": self.connected,
+            "sim": self.sim,
+            "name": self.name,
+            "port": self.port,
+            "protocol": self.protocol,
+            "baud": self.baud,
+            "databits": self.databits,
+            "parity": self.parity,
+            "weight": data.get("weight"),
+            "raw_weight": data.get("raw_weight"),
+            "unit": self.unit,
+            "stable": self.stable,
+            "status": self.status_detail,
+            "age": data.get("age", 0.0),
+            "rx_lines": self.rx_lines,
+            "rx_bytes": self.rx_bytes,
+            "bytes_per_sec": bps,
+            "log": new_logs,
+            "log_last_id": self.log_history[-1]["id"] if self.log_history else 0
         }
 
     # ────────────────────────────────────────────────────────────
@@ -464,7 +531,7 @@ class ScaleInstance:
     # Loop Simulator
     # ────────────────────────────────────────────────────────────
     def _simulator_loop(self):
-        base_weight = 125.40
+        base_weight = 123.45
         step = 0
         while not self._stop.is_set():
             if self._paused.is_set():
@@ -473,16 +540,20 @@ class ScaleInstance:
 
             step += 1
             cycle = step % 20
-            if cycle < 12:
+            if cycle < 14:
                 self.stable = True
-                self.weight = base_weight + (int(step / 40) % 5) * 10.0
+                self.weight = base_weight + (int(step / 40) % 5) * 5.0
             else:
                 self.stable = False
-                noise = random.uniform(-0.8, 0.8)
+                noise = random.uniform(-0.5, 0.5)
                 self.weight = base_weight + noise
 
             self.unit = "g"
             self.last_update_ts = time.time()
+            self.rx_lines += 1
+            self.rx_bytes += 16
+            sim_line = f"S S {self.weight:8.2f} g"
+            self._log("rx", sim_line, hex_data=sim_line.encode("latin1").hex(" "))
             time.sleep(self.poll_interval)
 
 
@@ -546,20 +617,39 @@ class ScaleManager:
 
                         # Jika belum terhubung dan autoconnect aktif
                         if not sc.connected and sc.autoconnect:
+                            claimed = self.get_claimed_ports(exclude=sc)
                             matched_port = None
 
                             # Cocokkan berdasarkan USB Serial Number (e.g. BMCBE14A312)
                             if sc.usb_serial:
                                 for p in present_ports:
+                                    if p.device in claimed:
+                                        continue
                                     sn = (p.serial_number or "").strip().upper()
                                     hw = (p.hwid or "").strip().upper()
                                     if sc.usb_serial == sn or f"SER={sc.usb_serial}" in hw:
                                         matched_port = p.device
                                         break
 
-                            # Cocokkan berdasarkan port name (e.g. COM5)
-                            if not matched_port and sc.port in present_devices:
+                            # Cocokkan berdasarkan port name (e.g. COM5 atau /dev/ttyUSB0)
+                            if not matched_port and sc.port in present_devices and sc.port not in claimed:
                                 matched_port = sc.port
+
+                            # Fallback: cari port serial yang belum diklaim
+                            if not matched_port:
+                                for p in present_ports:
+                                    if p.device in claimed:
+                                        continue
+                                    hw = (p.hwid or "").upper()
+                                    desc = (p.description or "").upper()
+                                    dev = p.device
+                                    if (
+                                        "067B" in hw or "PL2303" in desc or "CH340" in desc or 
+                                        "FTDI" in desc or "CP210" in desc or 
+                                        dev.startswith("/dev/ttyUSB") or dev.startswith("/dev/ttyACM")
+                                    ):
+                                        matched_port = p.device
+                                        break
 
                             # Jika ditemukan, koneksikan otomatis!
                             if matched_port:
@@ -582,7 +672,8 @@ class ScaleManager:
             if sc.port == "SIM":
                 continue
             if not sc.connected and sc.autoconnect and not sc.manual_stop:
-                sc._auto_resolve_port()
+                claimed = self.get_claimed_ports(exclude=sc)
+                sc._auto_resolve_port(claimed_ports=claimed)
                 sc.connect()
 
     def set_enable_scale_at_startup(self, enabled: bool) -> bool:
@@ -604,7 +695,8 @@ class ScaleManager:
             logger.info("[ScaleManager] Opsi startup timbangan diaktifkan: Menyambungkan kembali timbangan autoconnect...")
             for sc in self.scales.values():
                 if sc.port != "SIM" and sc.autoconnect and not sc.connected and not sc.manual_stop:
-                    sc._auto_resolve_port()
+                    claimed = self.get_claimed_ports(exclude=sc)
+                    sc._auto_resolve_port(claimed_ports=claimed)
                     sc.connect()
         return True
 
@@ -667,6 +759,52 @@ class ScaleManager:
         return next(iter(self.scales.values()))
 
     def get_all_status(self) -> List[Dict[str, Any]]:
+        """Mengambil status seluruh timbangan berupa list data dict."""
         return [sc.get_data() for sc in self.scales.values()]
+
+    def get_claimed_ports(self, exclude: Optional[ScaleInstance] = None) -> Set[str]:
+        """Daftar port serial yang sedang dibuka/digunakan oleh timbangan lain."""
+        claimed = set()
+        for sc in self.scales.values():
+            if sc != exclude and sc.connected and sc.port and sc.port.upper() != "SIM":
+                claimed.add(sc.port)
+        return claimed
+
+    def connect_port(self, port: str, protocol: str = "auto", baud: int = 9600, databits: int = 8, parity: str = "N", stopbits: int = 1, poll_interval: float = 0.5) -> ScaleInstance:
+        port_clean = port.strip()
+        target = None
+        for sc in self.scales.values():
+            if sc.port.lower() == port_clean.lower() or (port_clean.upper() == "SIM" and sc.port.upper() == "SIM"):
+                target = sc
+                break
+
+        override = {
+            "port": port_clean,
+            "protocol": protocol,
+            "baud": baud,
+            "databits": databits,
+            "parity": parity,
+            "stopbits": stopbits,
+            "poll_interval": poll_interval
+        }
+
+        if not target:
+            name = f"Timbangan {port_clean}" if port_clean.upper() != "SIM" else "Simulator Timbangan"
+            cfg = {
+                "name": name,
+                "port": port_clean,
+                "protocol": protocol,
+                "baud": baud,
+                "databits": databits,
+                "parity": parity,
+                "stopbits": stopbits,
+                "poll_interval": poll_interval,
+                "autoconnect": True
+            }
+            target = ScaleInstance(cfg)
+            self.scales[name] = target
+
+        target.connect(override)
+        return target
 
 scale_manager = ScaleManager()

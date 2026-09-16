@@ -27,7 +27,7 @@ function switchTab(tabId) {
     if (activeBtn) activeBtn.classList.add('active');
 
     if (tabId === 'printers') loadPrinters();
-    if (tabId === 'scales') loadScales();
+    if (tabId === 'scales') { loadScales(); loadControlPorts(); pollScaleTerminal(); }
     if (tabId === 'serial') loadSerialPorts();
     if (tabId === 'history') loadPrintHistory();
     if (tabId === 'settings') { loadSettings(); loadPrinterPools(); }
@@ -99,10 +99,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     // Polling periodik (500ms) sebagai safety net
     setInterval(loadScales, 500);
+    setInterval(() => {
+        const tabScales = document.getElementById('tab-scales');
+        if (tabScales && tabScales.style.display !== 'none') {
+            pollScaleTerminal();
+        }
+    }, 400);
 
     await bridge.connect();
     loadSystemStatus();
     loadPrinters();
+    loadControlPorts();
     loadScales();
     loadPrintHistory();
 });
@@ -290,47 +297,391 @@ function testPrintSpecific(printerName) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Scale Controller
+// Scale Controller & Interactive Testing Console
 // ────────────────────────────────────────────────────────────
 
-function updateLcdDisplay(scaleData) {
-    const weightVal = document.getElementById('lcdWeightVal');
-    const unitVal = document.getElementById('lcdUnitVal');
-    const stableBadge = document.getElementById('lcdStableBadge');
-    const stateBadge = document.getElementById('lcdStateBadge');
-    const scaleName = document.getElementById('lcdScaleName');
-    const statWeight = document.getElementById('statWeight');
+let terminalLastLogId = 0;
+let terminalLogBuffer = [];
+let isScalePaused = false;
 
+function updateLcdDisplay(scaleData) {
     if (!scaleData) return;
 
-    const w = (scaleData.weight !== null && scaleData.weight !== undefined) ? scaleData.weight.toFixed(2) : '0.00';
-    weightVal.textContent = w;
-    unitVal.textContent = scaleData.unit || 'g';
-    statWeight.textContent = `${w} ${scaleData.unit || 'g'}`;
+    const weightVal = document.getElementById('lcdWeightVal');
+    const unitVal = document.getElementById('lcdUnitVal');
+    const connBadge = document.getElementById('conn-badge');
+    const stableBadge = document.getElementById('stable-badge');
+    const ageBadge = document.getElementById('age-badge');
+    const detailStatus = document.getElementById('scaleDetailStatus');
+    const statWeight = document.getElementById('statWeight');
 
-    if (scaleData.stable) {
-        stableBadge.className = 'badge badge-success';
-        stableBadge.textContent = 'STABIL (STABLE)';
-    } else {
-        stableBadge.className = 'badge badge-warning';
-        stableBadge.textContent = 'BERGERAK (UNSTABLE)';
+    // Legacy badge fallback
+    const legacyStableBadge = document.getElementById('lcdStableBadge');
+    const legacyStateBadge = document.getElementById('lcdStateBadge');
+    const legacyScaleName = document.getElementById('lcdScaleName');
+
+    const isConnected = !!scaleData.connected;
+    const w = (scaleData.weight !== null && scaleData.weight !== undefined) ? scaleData.weight.toFixed(2) : '--.--';
+    const u = scaleData.unit || 'g';
+
+    if (weightVal) weightVal.textContent = isConnected ? w : '--.--';
+    if (unitVal) unitVal.textContent = u;
+    if (statWeight) statWeight.textContent = isConnected ? `${w} ${u}` : '0.00 g';
+
+    if (connBadge) {
+        if (isConnected) {
+            connBadge.className = 'badge badge-success';
+            connBadge.textContent = 'Terhubung';
+        } else if (scaleData.state === 'paused' || scaleData.state === 'standby') {
+            connBadge.className = 'badge badge-warning';
+            connBadge.textContent = 'Dilepas';
+        } else {
+            connBadge.className = 'badge badge-danger';
+            connBadge.textContent = 'Terputus';
+        }
     }
 
-    if (scaleData.state === 'online') {
-        stateBadge.className = 'badge badge-success';
-        stateBadge.textContent = 'ONLINE';
-    } else if (scaleData.state === 'standby') {
-        stateBadge.className = 'badge badge-warning';
-        stateBadge.textContent = 'STANDBY (OFF)';
-    } else if (scaleData.state === 'locked_by_other') {
-        stateBadge.className = 'badge badge-warning';
-        stateBadge.textContent = 'TERKUNCI DELPHI';
-    } else {
-        stateBadge.className = 'badge badge-danger';
-        stateBadge.textContent = scaleData.state.toUpperCase();
+    if (stableBadge) {
+        if (isConnected) {
+            stableBadge.style.display = 'inline-block';
+            if (scaleData.stable) {
+                stableBadge.className = 'badge badge-success';
+                stableBadge.textContent = 'Stabil';
+            } else {
+                stableBadge.className = 'badge badge-warning';
+                stableBadge.textContent = 'Dinamis';
+            }
+        } else {
+            stableBadge.style.display = 'none';
+        }
     }
 
-    scaleName.textContent = `${scaleData.name} [${scaleData.port}] (${scaleData.protocol})`;
+    if (ageBadge) {
+        if (isConnected && scaleData.age !== undefined) {
+            ageBadge.style.display = 'inline-block';
+            ageBadge.textContent = `${Number(scaleData.age).toFixed(1)}s`;
+        } else {
+            ageBadge.style.display = 'none';
+        }
+    }
+
+    if (detailStatus) {
+        detailStatus.textContent = scaleData.status_detail || (isConnected ? `${scaleData.name || 'Timbangan'} aktif` : 'Timbangan tidak terhubung');
+    }
+
+    if (legacyStableBadge) {
+        legacyStableBadge.className = scaleData.stable ? 'badge badge-success' : 'badge badge-warning';
+        legacyStableBadge.textContent = scaleData.stable ? 'STABIL' : 'BERGERAK';
+    }
+    if (legacyStateBadge) {
+        legacyStateBadge.className = isConnected ? 'badge badge-success' : 'badge badge-danger';
+        legacyStateBadge.textContent = (scaleData.state || 'OFFLINE').toUpperCase();
+    }
+    if (legacyScaleName) {
+        legacyScaleName.textContent = `${scaleData.name || ''} [${scaleData.port || ''}]`;
+    }
+}
+
+async function loadControlPorts() {
+    const sel = document.getElementById('ctrlPort');
+    if (!sel) return;
+    try {
+        const res = await fetch('/api/ports');
+        const ports = await res.json();
+        const prevVal = sel.value;
+        sel.innerHTML = '';
+
+        // Option 1: Simulator
+        const simOpt = document.createElement('option');
+        simOpt.value = 'SIM';
+        simOpt.textContent = 'SIM — Simulator Mode (mock data)';
+        sel.appendChild(simOpt);
+
+        let selected = false;
+        ports.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.device;
+            opt.textContent = `${p.device}: ${p.description || 'Serial Device'}${p.connected ? ' (terhubung)' : ''}`;
+            if (p.connected) {
+                opt.selected = true;
+                selected = true;
+            } else if (!selected && prevVal && p.device === prevVal) {
+                opt.selected = true;
+                selected = true;
+            }
+            sel.appendChild(opt);
+        });
+
+        if (!selected && (prevVal === 'SIM' || !prevVal)) {
+            simOpt.selected = true;
+        }
+    } catch (e) {
+        console.warn('Gagal memuat ports control:', e);
+    }
+}
+
+function onProtocolPresetChange() {
+    const proto = document.getElementById('ctrlProtocol')?.value || 'auto';
+    const baudSel = document.getElementById('ctrlBaud');
+    const frameSel = document.getElementById('ctrlFrame');
+
+    if (proto === 'and') {
+        if (baudSel) baudSel.value = '2400';
+        if (frameSel) frameSel.value = '7E';
+    } else {
+        if (baudSel) baudSel.value = '9600';
+        if (frameSel) frameSel.value = '8N';
+    }
+
+    const grpMettler = document.getElementById('cmds-mettler');
+    const grpShinko = document.getElementById('cmds-shinko');
+    const grpAnd = document.getElementById('cmds-and');
+
+    if (grpMettler) grpMettler.style.display = (proto === 'mettler' || proto === 'auto') ? 'flex' : 'none';
+    if (grpShinko) grpShinko.style.display = (proto === 'shinko') ? 'flex' : 'none';
+    if (grpAnd) grpAnd.style.display = (proto === 'and') ? 'flex' : 'none';
+}
+
+async function connectActiveScale() {
+    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    const protocol = document.getElementById('ctrlProtocol')?.value || 'auto';
+    const baud = parseInt(document.getElementById('ctrlBaud')?.value || '9600', 10);
+    const frame = document.getElementById('ctrlFrame')?.value || '8N';
+    const interval = parseFloat(document.getElementById('ctrlInterval')?.value || '0.5');
+
+    const databits = parseInt(frame[0], 10) || 8;
+    const parity = frame[1] || 'N';
+
+    addLog(`Menghubungkan ke ${port} (Protokol: ${protocol}, Baud: ${baud}, Frame: ${frame})...`);
+    try {
+        const res = await fetch('/api/connect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                port: port,
+                protocol: protocol,
+                baud: baud,
+                databits: databits,
+                parity: parity,
+                stopbits: 1,
+                poll_interval: interval
+            })
+        });
+        const data = await res.json();
+        if (data.ok || data.status === 'success') {
+            addLog(`✅ Terhubung ke ${data.name || port}!`, 'success');
+        } else {
+            addLog(`❌ Gagal terhubung: ${data.detail || data.message || 'Error'}`, 'error');
+        }
+        await loadControlPorts();
+        await loadScales();
+        await pollScaleTerminal();
+    } catch (e) {
+        addLog(`❌ Error connect scale: ${e.message}`, 'error');
+    }
+}
+
+async function disconnectActiveScale() {
+    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Memutuskan koneksi timbangan ${port}...`);
+    try {
+        const res = await fetch('/api/disconnect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ port: port })
+        });
+        const data = await res.json();
+        addLog(`🔌 ${data.message || 'Koneksi ditutup.'}`);
+        await loadControlPorts();
+        await loadScales();
+        await pollScaleTerminal();
+    } catch (e) {
+        addLog(`❌ Error disconnect: ${e.message}`, 'error');
+    }
+}
+
+async function scanBaudActiveScale() {
+    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`🔍 Memindai baud rate otomatis untuk ${port}...`);
+    try {
+        const res = await fetch(`/api/scale/scan-baud?port=${encodeURIComponent(port)}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok && data.baud) {
+            addLog(`✅ Baud rate ditemukan: ${data.baud}`, 'success');
+            const baudSel = document.getElementById('ctrlBaud');
+            if (baudSel) baudSel.value = String(data.baud);
+            alert(`Baud rate ditemukan: ${data.baud}`);
+        } else {
+            addLog(`⚠️ ${data.message || 'Baud rate tidak merespons.'}`, 'warn');
+            alert(data.message || 'Tidak ada respons dari timbangan.');
+        }
+        await loadScales();
+    } catch (e) {
+        addLog(`❌ Error scan baud: ${e.message}`, 'error');
+    }
+}
+
+async function togglePausePort() {
+    const btn = document.getElementById('btnCtrlPause');
+    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    if (!isScalePaused) {
+        addLog(`Melepas port ${port} untuk aplikasi lain (Delphi/Web Serial)...`);
+        try {
+            const res = await fetch(`/api/scale/pause?scale=${encodeURIComponent(port)}`, { method: 'POST' });
+            const data = await res.json();
+            isScalePaused = true;
+            if (btn) btn.innerHTML = '▶️ Sambung Lagi';
+            addLog(`⏸️ Port dilepas. Bebas dibuka oleh Delphi atau browser.`, 'warn');
+            await loadScales();
+        } catch (e) {
+            addLog(`❌ Error pause: ${e.message}`, 'error');
+        }
+    } else {
+        addLog(`Menyambungkan kembali port ${port}...`);
+        try {
+            const res = await fetch(`/api/scale/resume?scale=${encodeURIComponent(port)}`, { method: 'POST' });
+            const data = await res.json();
+            isScalePaused = false;
+            if (btn) btn.innerHTML = '⏸️ Lepas Port';
+            addLog(`▶️ Port disambungkan kembali.`, 'success');
+            await loadScales();
+        } catch (e) {
+            addLog(`❌ Error resume: ${e.message}`, 'error');
+        }
+    }
+}
+
+async function restartScaleService() {
+    addLog('Merestart service timbangan & memindai port...');
+    try {
+        await resumeScale();
+        await loadControlPorts();
+        await loadScales();
+        addLog('✅ Service timbangan direfresh.', 'success');
+    } catch (e) {
+        addLog(`❌ Error restart: ${e.message}`, 'error');
+    }
+}
+
+async function sendScaleCmd(cmd) {
+    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    addLog(`Mengirim perintah [${cmd}] ke ${port}...`);
+    try {
+        const res = await fetch('/api/command', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ port: port, command: cmd })
+        });
+        const data = await res.json();
+        if (data.status === 'success' || data.ok) {
+            addLog(`✅ Perintah [${cmd}] terkirim`, 'success');
+        } else {
+            addLog(`❌ Gagal kirim perintah [${cmd}]`, 'error');
+        }
+        await pollScaleTerminal();
+    } catch (e) {
+        addLog(`❌ Error kirim perintah: ${e.message}`, 'error');
+    }
+}
+
+async function sendManualScaleCmd() {
+    const input = document.getElementById('manualCmdInput');
+    if (!input) return;
+    const cmd = input.value.trim();
+    if (!cmd) return;
+    input.value = '';
+    await sendScaleCmd(cmd);
+}
+
+function clearTerminalLogs() {
+    terminalLogBuffer = [];
+    const term = document.getElementById('scaleLogTerminal');
+    if (term) term.innerHTML = '';
+}
+
+function renderTerminalLogs() {
+    const term = document.getElementById('scaleLogTerminal');
+    if (!term) return;
+    const showHex = document.getElementById('chkShowHex')?.checked || false;
+    const autoscroll = document.getElementById('chkAutoscroll')?.checked !== false;
+
+    let html = '';
+    terminalLogBuffer.forEach(entry => {
+        const t = entry.time || '';
+        const dir = entry.dir || 'INFO';
+        const msg = (entry.msg || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const hex = entry.hex ? ` <span style="color: #64748b; font-size: 0.72rem;">[HEX: ${entry.hex}]</span>` : '';
+
+        if (dir === 'TX') {
+            html += `<div><span style="color: #60a5fa;">[${t}] TX &gt; ${msg}</span>${showHex ? hex : ''}</div>`;
+        } else if (dir === 'RX') {
+            html += `<div><span style="color: #4ade80;">[${t}] RX &lt; ${msg}</span>${showHex ? hex : ''}</div>`;
+        } else {
+            html += `<div><span style="color: #fbbf24;">[${t}] * ${msg}</span></div>`;
+        }
+    });
+
+    term.innerHTML = html;
+    if (autoscroll) {
+        term.scrollTop = term.scrollHeight;
+    }
+}
+
+async function pollScaleTerminal() {
+    const port = document.getElementById('ctrlPort')?.value || 'SIM';
+    try {
+        const res = await fetch(`/api/scale/state?port=${encodeURIComponent(port)}&since=${terminalLastLogId}`);
+        if (!res.ok) return;
+        const state = await res.json();
+
+        // Update metrics
+        const elLines = document.getElementById('st-lines');
+        const elBytes = document.getElementById('st-bytes');
+        const elRate = document.getElementById('st-rate');
+        if (elLines) elLines.textContent = state.rx_lines !== undefined ? state.rx_lines : 0;
+        if (elBytes) elBytes.textContent = state.rx_bytes !== undefined ? state.rx_bytes : 0;
+        if (elRate) elRate.textContent = state.bytes_per_sec !== undefined ? state.bytes_per_sec : 0;
+
+        // Update Connection Status Bar
+        const dot = document.getElementById('ctrlStatusDot');
+        const text = document.getElementById('ctrlStatusText');
+        const btnConn = document.getElementById('btnCtrlConnect');
+        const btnDisc = document.getElementById('btnCtrlDisconnect');
+
+        if (state.connected) {
+            if (dot) dot.textContent = '🟢';
+            if (text) text.textContent = `${state.port || port} (${state.baud || 9600} ${state.databits || 8}${state.parity || 'N'}1) — terhubung`;
+            if (btnConn) btnConn.disabled = true;
+            if (btnDisc) btnDisc.disabled = false;
+        } else if (state.state === 'paused' || state.state === 'standby') {
+            if (dot) dot.textContent = '🟡';
+            if (text) text.textContent = `${state.port || port} — port dilepas (standby)`;
+            if (btnConn) btnConn.disabled = false;
+            if (btnDisc) btnDisc.disabled = true;
+        } else {
+            if (dot) dot.textContent = '🔴';
+            if (text) text.textContent = `${state.port || port} — terputus`;
+            if (btnConn) btnConn.disabled = false;
+            if (btnDisc) btnDisc.disabled = true;
+        }
+
+        // Update LCD Display
+        updateLcdDisplay(state);
+
+        // Update Terminal Logs
+        if (state.log && state.log.length > 0) {
+            terminalLogBuffer.push(...state.log);
+            if (terminalLogBuffer.length > 250) {
+                terminalLogBuffer = terminalLogBuffer.slice(-250);
+            }
+            if (state.log_last_id) {
+                terminalLastLogId = state.log_last_id;
+            }
+            renderTerminalLogs();
+        }
+    } catch (e) {
+        // Silently catch poll errors
+    }
 }
 
 let scaleStartupEnabled = false;
@@ -412,7 +763,7 @@ function updateScaleTable(scales) {
             <td>${s.protocol.toUpperCase()}</td>
             <td><span class="badge ${s.state === 'online' ? 'badge-success' : (s.state === 'standby' || s.state === 'paused' ? 'badge-warning' : 'badge-secondary')}">${s.state}</span></td>
             <td>${connBadge}</td>
-            <td><b>${s.weight} ${s.unit}</b> ${s.stable ? '✓' : '~'}</td>
+            <td><b>${s.weight !== null ? s.weight : '--.--'} ${s.unit}</b> ${s.stable ? '✓' : '~'}</td>
         `;
         tbody.appendChild(tr);
     });

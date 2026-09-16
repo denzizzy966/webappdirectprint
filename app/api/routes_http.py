@@ -60,6 +60,7 @@ class PrinterPoolsUpdateRequest(BaseModel):
 
 class ScaleCommandRequest(BaseModel):
     scale: Optional[str] = None
+    port: Optional[str] = None
     command: str
 
 class ScaleYieldRequest(BaseModel):
@@ -74,14 +75,20 @@ class StableReadRequest(BaseModel):
     timeout: Optional[float] = 10.0
 
 class ScaleConnectRequest(BaseModel):
-    name: str
+    name: Optional[str] = None
     port: str
-    protocol: Optional[str] = "mettler"
+    protocol: Optional[str] = "auto"
     baud: Optional[int] = 9600
     databits: Optional[int] = 8
     parity: Optional[str] = "N"
     stopbits: Optional[int] = 1
     poll_interval: Optional[float] = 0.5
+    handshake: Optional[str] = "none"
+    mode: Optional[str] = "poll"
+
+class ScaleDisconnectRequest(BaseModel):
+    port: Optional[str] = None
+    scale: Optional[str] = None
 
 # ────────────────────────────────────────────────────────────
 # Printer Endpoints
@@ -321,14 +328,116 @@ def scale_tare(scale: Optional[str] = Query(None)):
     ok = instance.tare()
     return {"status": "success" if ok else "error", "message": "Perintah Tare dikirim"}
 
+@router.get("/ports")
+def get_ports_list():
+    """Mengambil daftar port serial lengkap beserta flag connected (kompatibel timbangan-service)."""
+    ports = scale_manager.list_serial_ports()
+    connected_ports = {sc.port.upper() for sc in scale_manager.scales.values() if sc.connected}
+    out = []
+    for p in ports:
+        dev = p["device"]
+        out.append({
+            "device": dev,
+            "description": p.get("description", ""),
+            "connected": dev.upper() in connected_ports
+        })
+    return out
+
+@router.post("/connect")
+@router.post("/scale/connect")
+def connect_scale_api(req: ScaleConnectRequest):
+    """Menyambungkan timbangan pada port tertentu (atau SIM) dengan konfigurasi protocol/baud."""
+    instance = scale_manager.connect_port(
+        port=req.port,
+        protocol=req.protocol or "auto",
+        baud=req.baud or 9600,
+        databits=req.databits or 8,
+        parity=req.parity or "N",
+        stopbits=req.stopbits or 1,
+        poll_interval=req.poll_interval or 0.5
+    )
+    return {
+        "ok": instance.connected,
+        "status": "success" if instance.connected else "error",
+        "name": instance.name,
+        "port": instance.port,
+        "state": instance.state,
+        "detail": instance.status_detail
+    }
+
+@router.post("/disconnect")
+@router.post("/scale/disconnect")
+def disconnect_scale_api(req: Optional[ScaleDisconnectRequest] = None):
+    """Memutuskan koneksi timbangan."""
+    target_port = req.port if req else None
+    target_scale = req.scale if req else None
+    instance = None
+    if target_scale:
+        instance = scale_manager.get_scale(target_scale)
+    elif target_port:
+        for sc in scale_manager.scales.values():
+            if sc.port.lower() == target_port.lower():
+                instance = sc
+                break
+    if not instance:
+        instance = scale_manager.get_scale()
+    if instance:
+        instance.disconnect()
+        instance.manual_stop = True
+        return {"ok": True, "status": "success", "message": f"Koneksi {instance.name} ({instance.port}) ditutup"}
+    return {"ok": False, "status": "error", "message": "Timbangan tidak ditemukan"}
+
+@router.get("/state")
+@router.get("/scale/state")
+def get_scale_state_api(port: Optional[str] = Query(None), since: Optional[int] = Query(0)):
+    """Mengambil status detail, live metrics, dan delta log RX/TX."""
+    target = None
+    if port:
+        for sc in scale_manager.scales.values():
+            if sc.port.lower() == port.lower() or (port.upper() == "SIM" and sc.port.upper() == "SIM"):
+                target = sc
+                break
+    if not target:
+        target = scale_manager.get_scale()
+    if not target:
+        return {"ok": False, "connected": False, "log": [], "log_last_id": 0}
+    return target.get_state(since=since or 0)
+
+@router.post("/scale/scan-baud")
+def scan_baud_api(port: Optional[str] = Query(None)):
+    """Pindai baud rate otomatis (9600, 4800, 2400, 1200)."""
+    target = scale_manager.get_scale(port)
+    if not target or target.sim:
+        return {"ok": True, "baud": 9600, "parity": "8N", "message": "Baudrate 9600 OK"}
+    # Tes baud rate umum
+    bauds_to_test = [9600, 4800, 2400, 1200, 19200]
+    for b in bauds_to_test:
+        target.connect({"baud": b})
+        time.sleep(0.3)
+        if target.weight is not None and target.last_update_ts and (time.time() - target.last_update_ts < 2.0):
+            return {"ok": True, "baud": b, "message": f"Baudrate ditemukan: {b}"}
+    # Kembalikan ke 9600
+    target.connect({"baud": 9600})
+    return {"ok": False, "message": "Tidak ada respons timbangan pada baudrate umum, dikembalikan ke 9600"}
+
+@router.post("/command")
 @router.post("/scale/command")
 def scale_custom_command(req: ScaleCommandRequest):
     """Mengirim perintah teks kustom ke timbangan (misal: SI, S, SIR, O9, Z)."""
-    instance = scale_manager.get_scale(req.scale)
+    instance = None
+    if req.scale:
+        instance = scale_manager.get_scale(req.scale)
+    elif req.port:
+        for sc in scale_manager.scales.values():
+            if sc.port.lower() == req.port.lower():
+                instance = sc
+                break
+    if not instance:
+        instance = scale_manager.get_scale()
     if not instance:
         raise HTTPException(status_code=404, detail="Timbangan tidak ditemukan")
     ok = instance.send_command(req.command)
-    return {"status": "success" if ok else "error", "command": req.command}
+    return {"status": "success" if ok else "error", "command": req.command, "ok": ok}
 
 @router.post("/scale/pause")
 def scale_pause(scale: Optional[str] = Query(None), seconds: Optional[int] = Query(None)):
