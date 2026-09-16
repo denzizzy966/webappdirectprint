@@ -1,4 +1,6 @@
 import asyncio
+import copy
+import io
 import logging
 import os
 import socket
@@ -7,6 +9,45 @@ import threading
 import webbrowser
 from pathlib import Path
 from typing import Optional
+
+# ────────────────────────────────────────────────────────────
+# Fix Windows GUI / PyInstaller console=False (sys.stdout is None)
+# ────────────────────────────────────────────────────────────
+class SafeNullStream:
+    """Stream pengganti stdout/stderr jika aplikasi berjalan tanpa jendela konsol (pythonw / PyInstaller console=False)."""
+    encoding = "utf-8"
+    errors = "replace"
+    closed = False
+
+    def write(self, s):
+        pass
+
+    def writelines(self, lines):
+        pass
+
+    def flush(self):
+        pass
+
+    def isatty(self):
+        return False
+
+    def readable(self):
+        return False
+
+    def writable(self):
+        return True
+
+    def seekable(self):
+        return False
+
+if sys.stdout is None or not hasattr(sys.stdout, "isatty"):
+    sys.stdout = SafeNullStream()
+
+if sys.stderr is None or not hasattr(sys.stderr, "isatty"):
+    sys.stderr = SafeNullStream()
+
+if sys.stdin is None:
+    sys.stdin = io.StringIO()
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -21,7 +62,7 @@ from app.printer import printer_manager
 from app.serial_scale import scale_manager
 
 # ────────────────────────────────────────────────────────────
-# Setup Logging (Safe for Windows console cp1252)
+# Setup Logging (Safe for Windows console cp1252 and GUI mode)
 # ────────────────────────────────────────────────────────────
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -30,11 +71,15 @@ class SafeStreamHandler(logging.StreamHandler):
         try:
             msg = self.format(record)
             stream = self.stream
+            if stream is None:
+                return
             # Hindari UnicodeEncodeError pada terminal cp1252 Windows
             try:
                 stream.write(msg + self.terminator)
             except UnicodeEncodeError:
                 stream.write(msg.encode('ascii', errors='backslashreplace').decode('ascii') + self.terminator)
+            except Exception:
+                pass
             self.flush()
         except Exception:
             self.handleError(record)
@@ -201,7 +246,15 @@ def main():
 
     logger.info(f"[Server] Berjalan di: http://{host}:{active_port}")
     logger.info(f"[Server] WebSocket: ws://{host}:{active_port}/ws")
-    uvicorn.run(app, host=host, port=active_port, log_level="info")
+
+    import uvicorn.config
+    log_config = copy.deepcopy(uvicorn.config.LOGGING_CONFIG)
+    if "formatters" in log_config:
+        for fmt in log_config["formatters"].values():
+            if isinstance(fmt, dict) and "use_colors" in fmt:
+                fmt["use_colors"] = False
+
+    uvicorn.run(app, host=host, port=active_port, log_level="info", log_config=log_config)
 
 if __name__ == "__main__":
     main()
