@@ -5,7 +5,7 @@ a = Analysis(
     ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[('templates', 'templates'), ('static', 'static'), ('bridge_config.json', '.')],
+    datas=[('templates', 'templates'), ('static', 'static'), ('bridge_config.json', '.'), ('erpnext', 'erpnext')],
     hiddenimports=['win32print', 'win32ui', 'win32con', 'fitz', 'PIL', 'PIL.ImageWin', 'pystray', 'serial', 'uvicorn', 'uvicorn.logging', 'uvicorn.loops.auto', 'uvicorn.protocols.http.auto', 'uvicorn.protocols.websockets.auto', 'fastapi', 'starlette', 'anyio', 'jinja2'],
     hookspath=[],
     hooksconfig={},
