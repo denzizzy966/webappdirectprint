@@ -42,3 +42,6 @@ Desktop.ini
 # un-comment 2 baris di bawah:
 # *.zip
 # *.tar.gz
+
+# Screenshots
+screencapture-*.png
