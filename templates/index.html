@@ -445,8 +445,14 @@
           <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Host Pengikat:</label>
           <input type="text" id="cfgHost" value="127.0.0.1">
 
-          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Port Service (WebSocket & HTTP):</label>
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Port Service Utama (Direct Print &amp; Web):</label>
           <input type="number" id="cfgPort" value="18212">
+
+          <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Port Khusus Timbangan (Opsional - Pisah Port):</label>
+          <input type="number" id="cfgScalePort" placeholder="Kosongkan jika jadi 1 dengan Port Service Utama (Default: 18212)">
+          <small style="display: block; color: var(--text-muted); margin-top: -0.2rem; margin-bottom: 1rem; font-size: 0.82rem; line-height: 1.4;">
+            💡 <b>Default: Jadi 1 port</b>. Kosongkan field ini jika ingin Print &amp; Timbangan berjalan bersamaan di port utama (18212). Isi angka port (misal <code>18213</code> atau <code>12212</code>) jika ingin port HTTP &amp; WebSocket timbangan dipisahkan.
+          </small>
 
           <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Mode Port Sharing Timbangan:</label>
           <select id="cfgSharingMode">

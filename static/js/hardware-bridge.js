@@ -53,6 +53,8 @@
 
             this.host = options.host || defHost;
             this.port = options.port || defPort;
+            this.scaleHost = options.scaleHost || this.host;
+            this.scalePort = options.scalePort || this.port; // Default sama dengan port utama (jadi 1 port)
             this.useSecure = options.secure || (typeof window !== 'undefined' && window.location && window.location.protocol === 'https:');
             this.autoReconnect = options.autoReconnect !== false;
             this.reconnectInterval = options.reconnectInterval || 3000;
@@ -73,6 +75,16 @@
         get httpUrl() {
             const proto = this.useSecure ? 'https://' : 'http://';
             return `${proto}${this.host}:${this.port}/api`;
+        }
+
+        get scaleWsUrl() {
+            const proto = this.useSecure ? 'wss://' : 'ws://';
+            return `${proto}${this.scaleHost}:${this.scalePort}/ws`;
+        }
+
+        get scaleHttpUrl() {
+            const proto = this.useSecure ? 'https://' : 'http://';
+            return `${proto}${this.scaleHost}:${this.scalePort}/api`;
         }
 
         connect() {
@@ -296,14 +308,37 @@
     // ────────────────────────────────────────────────────────────
 
     HardwareBridge.SERVICE_URL = `http://${DEFAULT_HOST}:${DEFAULT_PORT}`;
+    HardwareBridge.SCALE_SERVICE_URL = null; // Port/URL terpisah untuk timbangan jika diset (default: null / jadi 1 port dengan SERVICE_URL)
     HardwareBridge.MAX_AGE_S = 5;
     HardwareBridge.STABLE_TIMEOUT_S = 10;
     HardwareBridge.onError = null;
 
+    // Helper untuk mengubah port/URL jika port timbangan & print dipisahkan
+    HardwareBridge.setPort = function (port) {
+        HardwareBridge.SERVICE_URL = `http://${DEFAULT_HOST}:${port}`;
+    };
+
+    HardwareBridge.setScalePort = function (port) {
+        HardwareBridge.SCALE_SERVICE_URL = `http://${DEFAULT_HOST}:${port}`;
+    };
+
+    HardwareBridge.configure = function (opts = {}) {
+        if (opts.serviceUrl) HardwareBridge.SERVICE_URL = opts.serviceUrl;
+        if (opts.port) HardwareBridge.SERVICE_URL = `http://${opts.host || DEFAULT_HOST}:${opts.port}`;
+        if (opts.scaleUrl) HardwareBridge.SCALE_SERVICE_URL = opts.scaleUrl;
+        if (opts.scalePort) HardwareBridge.SCALE_SERVICE_URL = `http://${opts.scaleHost || opts.host || DEFAULT_HOST}:${opts.scalePort}`;
+    };
+
     // HTTP Helper internal
     async function apiRequest(path, body, timeoutMs) {
-        const urlsToTry = [HardwareBridge.SERVICE_URL];
-        if (!HardwareBridge.SERVICE_URL.includes(String(FALLBACK_PORT))) {
+        const isScalePath = path.startsWith('/api/scale') || path.startsWith('/api/weight') || path.startsWith('/api/stream') ||
+                            path.startsWith('/scale') || path.startsWith('/weight') || path.startsWith('/stream');
+        
+        // Jika endpoint timbangan dan SCALE_SERVICE_URL dikonfigurasi terpisah, gunakan url timbangan
+        const primaryUrl = (isScalePath && HardwareBridge.SCALE_SERVICE_URL) ? HardwareBridge.SCALE_SERVICE_URL : HardwareBridge.SERVICE_URL;
+
+        const urlsToTry = [primaryUrl];
+        if (!isScalePath && !primaryUrl.includes(String(FALLBACK_PORT))) {
             urlsToTry.push(`http://${DEFAULT_HOST}:${FALLBACK_PORT}`);
         }
 
@@ -321,7 +356,7 @@
                 const r = await fetch(baseUrl + path, opt);
                 if (r.ok || r.status === 404 || r.status === 409 || r.status === 500) {
                     const data = await r.json();
-                    HardwareBridge.SERVICE_URL = baseUrl; // Cache working URL
+                    if (!isScalePath) HardwareBridge.SERVICE_URL = baseUrl; // Cache working URL
                     return data;
                 }
             } catch (e) {
@@ -330,7 +365,7 @@
                 clearTimeout(t);
             }
         }
-        throw lastErr || new Error('Gagal menghubungi Hardware Bridge di ' + HardwareBridge.SERVICE_URL);
+        throw lastErr || new Error('Gagal menghubungi Hardware Bridge di ' + primaryUrl);
     }
 
     HardwareBridge.api = apiRequest;

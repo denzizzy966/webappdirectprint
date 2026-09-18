@@ -8,8 +8,12 @@
  * 4. Paste isi script ini dan klik Save & Enable.
  */
 
-// URL Hardware Bridge (Default port 18212, kompatibel juga dengan 12212)
-const BRIDGE_URL = window.HARDWARE_BRIDGE_URL || 'http://127.0.0.1:18212';
+// URL Hardware Bridge (Default port 18212)
+// Default: Print dan Timbangan jadi SATU port (18212).
+// Jika ingin memisahkan port, set window.HARDWARE_SCALE_URL = 'http://127.0.0.1:18213';
+const BRIDGE_PRINT_URL = window.HARDWARE_PRINT_URL || window.HARDWARE_BRIDGE_URL || 'http://127.0.0.1:18212';
+const BRIDGE_SCALE_URL = window.HARDWARE_SCALE_URL || window.HARDWARE_BRIDGE_URL || BRIDGE_PRINT_URL;
+const BRIDGE_URL = BRIDGE_PRINT_URL; // Alias kompatibilitas mundur
 
 frappe.ui.form.on('POS Invoice', {
     refresh: function (frm) {
@@ -53,7 +57,7 @@ frappe.ui.form.on('POS Invoice Item', {
         frappe.show_alert({ message: __('Menunggu berat stabil...'), indicator: 'blue' });
         
         // Panggil endpoint stable-read (bisa tentukan nama timbangan spesifik misal scale=Shinko%201)
-        fetch(`${BRIDGE_URL}/api/scale/stable-read?timeout=5.0`, { method: 'POST' })
+        fetch(`${BRIDGE_SCALE_URL}/api/scale/stable-read?timeout=5.0`, { method: 'POST' })
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success' || data.ok) {
@@ -68,7 +72,7 @@ frappe.ui.form.on('POS Invoice Item', {
                 }
             })
             .catch(err => {
-                frappe.msgprint(__('Gagal menghubungi Hardware Bridge di PC Anda. Pastikan bridge aktif di {0}', [BRIDGE_URL]));
+                frappe.msgprint(__('Gagal menghubungi Hardware Bridge Timbangan di {0}', [BRIDGE_SCALE_URL]));
             });
     }
 });
@@ -116,7 +120,7 @@ function directPrintInvoice(frm) {
     receipt += "\x1d\x56\x42\x00";  // Potong kertas (Cut)
 
     // 2. Kirim ke Bridge Lokal di PC Client
-    fetch(`${BRIDGE_URL}/api/print/raw`, {
+    fetch(`${BRIDGE_PRINT_URL}/api/print/raw`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +138,7 @@ function directPrintInvoice(frm) {
         }
     })
     .catch(err => {
-        frappe.msgprint(__('Hardware Bridge offline atau tidak dapat diakses di {0}', [BRIDGE_URL]));
+        frappe.msgprint(__('Hardware Bridge offline atau tidak dapat diakses di {0}', [BRIDGE_PRINT_URL]));
     });
 }
 
@@ -142,7 +146,7 @@ function directPrintInvoice(frm) {
  * Membuka laci kasir (Cash Drawer Kick)
  */
 function openCashDrawer() {
-    fetch(`${BRIDGE_URL}/api/cashdrawer/open`, {
+    fetch(`${BRIDGE_PRINT_URL}/api/cashdrawer/open`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ printer: 'receipt', pin: 2 })
@@ -152,7 +156,7 @@ function openCashDrawer() {
         frappe.show_alert({ message: __('Laci kasir terbuka!'), indicator: 'green' });
     })
     .catch(err => {
-        frappe.msgprint(__('Gagal membuka laci kasir. Cek koneksi bridge.'));
+        frappe.msgprint(__('Gagal membuka laci kasir. Cek koneksi bridge di {0}', [BRIDGE_PRINT_URL]));
     });
 }
 
@@ -162,8 +166,8 @@ function openCashDrawer() {
 function fetchScaleWeight(frm, scaleName = null, targetField = null) {
     frappe.show_alert({ message: __('Menimbang... Harap tunggu stabil'), indicator: 'blue' });
     const url = scaleName 
-        ? `${BRIDGE_URL}/api/scale/stable-read?scale=${encodeURIComponent(scaleName)}&timeout=5.0`
-        : `${BRIDGE_URL}/api/scale/stable-read?timeout=5.0`;
+        ? `${BRIDGE_SCALE_URL}/api/scale/stable-read?scale=${encodeURIComponent(scaleName)}&timeout=5.0`
+        : `${BRIDGE_SCALE_URL}/api/scale/stable-read?timeout=5.0`;
 
     fetch(url, { method: 'POST' })
         .then(res => res.json())
@@ -190,7 +194,7 @@ function fetchScaleWeight(frm, scaleName = null, targetField = null) {
             }
         })
         .catch(err => {
-            frappe.msgprint(__('Hardware Bridge tidak terdeteksi di {0}', [BRIDGE_URL]));
+            frappe.msgprint(__('Hardware Bridge timbangan tidak terdeteksi di {0}', [BRIDGE_SCALE_URL]));
         });
 }
 
@@ -199,8 +203,8 @@ function fetchScaleWeight(frm, scaleName = null, targetField = null) {
  */
 function zeroScale(scaleName = null) {
     const url = scaleName 
-        ? `${BRIDGE_URL}/api/scale/zero?scale=${encodeURIComponent(scaleName)}`
-        : `${BRIDGE_URL}/api/scale/zero`;
+        ? `${BRIDGE_SCALE_URL}/api/scale/zero?scale=${encodeURIComponent(scaleName)}`
+        : `${BRIDGE_SCALE_URL}/api/scale/zero`;
 
     fetch(url, { method: 'POST' })
         .then(r => r.json())
@@ -218,8 +222,8 @@ function zeroScale(scaleName = null) {
  */
 function tareScale(scaleName = null) {
     const url = scaleName 
-        ? `${BRIDGE_URL}/api/scale/tare?scale=${encodeURIComponent(scaleName)}`
-        : `${BRIDGE_URL}/api/scale/tare`;
+        ? `${BRIDGE_SCALE_URL}/api/scale/tare?scale=${encodeURIComponent(scaleName)}`
+        : `${BRIDGE_SCALE_URL}/api/scale/tare`;
 
     fetch(url, { method: 'POST' })
         .then(r => r.json())

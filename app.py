@@ -176,7 +176,7 @@ async def serve_dashboard(request: Request):
 # System Tray Integration (Windows & Linux Desktops)
 # ────────────────────────────────────────────────────────────
 
-def create_tray_icon(port: int):
+def create_tray_icon(port: int, scale_port: Optional[int] = None):
     """Membuat ikon System Tray di pojok kanan bawah desktop (Windows)."""
     try:
         import pystray
@@ -193,7 +193,9 @@ def create_tray_icon(port: int):
             webbrowser.open(f"http://127.0.0.1:{port}")
 
         def get_web_port_label(item=None):
-            return f"🟢 Online — Port Web: {port}"
+            if scale_port and scale_port != port:
+                return f"🟢 Port Print: {port} | Timbangan: {scale_port}"
+            return f"🟢 Online — Port: {port}"
 
         def get_scale_port_label(item=None):
             try:
@@ -300,8 +302,22 @@ def main():
 
     enable_tray = server_cfg.get("enable_tray", True) and ("--no-tray" not in sys.argv)
 
+    # Port khusus timbangan (jika diset terpisah di bridge_config.json)
+    scale_port_cfg = server_cfg.get("scale_port")
+    active_scale_port = None
+    if scale_port_cfg:
+        try:
+            sp = int(scale_port_cfg)
+            if sp > 0 and sp != active_port:
+                if is_port_available(host, sp):
+                    active_scale_port = sp
+                else:
+                    logger.warning(f"[ScalePort] Port khusus timbangan {sp} sedang dipakai aplikasi lain!")
+        except Exception as e:
+            logger.warning(f"[ScalePort] Nilai scale_port '{scale_port_cfg}' tidak valid: {e}")
+
     if enable_tray and sys.platform == "win32":
-        tray_thread = threading.Thread(target=create_tray_icon, args=(active_port,), daemon=True)
+        tray_thread = threading.Thread(target=create_tray_icon, args=(active_port, active_scale_port), daemon=True)
         tray_thread.start()
 
     logger.info(f"[Server] Berjalan di: http://{host}:{active_port}")
@@ -313,6 +329,21 @@ def main():
         for fmt in log_config["formatters"].values():
             if isinstance(fmt, dict) and "use_colors" in fmt:
                 fmt["use_colors"] = False
+
+    # Jika port timbangan dipisah, jalankan server kedua di background thread
+    if active_scale_port:
+        logger.info(f"[ScaleServer] Port Khusus Timbangan Terpisah Aktif: http://{host}:{active_scale_port}")
+        logger.info(f"[ScaleServer] WebSocket Timbangan: ws://{host}:{active_scale_port}/ws")
+        def run_scale_listener():
+            try:
+                scale_cfg = uvicorn.Config(app, host=host, port=active_scale_port, log_level="warning", log_config=log_config)
+                server = uvicorn.Server(scale_cfg)
+                server.run()
+            except Exception as ex:
+                logger.error(f"[ScaleServer] Gagal menjalankan server timbangan di port {active_scale_port}: {ex}")
+
+        scale_thread = threading.Thread(target=run_scale_listener, daemon=True)
+        scale_thread.start()
 
     uvicorn.run(app, host=host, port=active_port, log_level="info", log_config=log_config)
 

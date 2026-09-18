@@ -22,7 +22,8 @@ LOG_DIR = BASE_DIR / "logs"
 DEFAULT_CONFIG: Dict[str, Any] = {
     "server": {
         "host": "0.0.0.0",
-        "port": 12212,
+        "port": 18212,
+        "scale_port": None,
         "cors_origins": ["*"],
         "enable_tray": True,
         "sharing_mode": "continuous",

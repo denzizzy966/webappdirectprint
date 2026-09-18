@@ -1122,6 +1122,9 @@ async function loadSettings() {
         if (cfg.server) {
             if (document.getElementById('cfgHost')) document.getElementById('cfgHost').value = cfg.server.host || '127.0.0.1';
             if (document.getElementById('cfgPort')) document.getElementById('cfgPort').value = cfg.server.port || 18212;
+            if (document.getElementById('cfgScalePort')) {
+                document.getElementById('cfgScalePort').value = cfg.server.scale_port || '';
+            }
             if (document.getElementById('cfgSharingMode')) document.getElementById('cfgSharingMode').value = cfg.server.sharing_mode || 'continuous';
             if (document.getElementById('cfgIdleRelease')) document.getElementById('cfgIdleRelease').value = cfg.server.idle_release_seconds || 4.0;
             if (document.getElementById('cfgScaleStartup')) {
@@ -1286,6 +1289,8 @@ async function savePrinterPools() {
 async function saveSettings() {
     const host = document.getElementById('cfgHost').value;
     const port = parseInt(document.getElementById('cfgPort').value, 10);
+    const rawScalePort = document.getElementById('cfgScalePort') ? document.getElementById('cfgScalePort').value.trim() : '';
+    const scalePort = rawScalePort ? parseInt(rawScalePort, 10) : null;
     const mode = document.getElementById('cfgSharingMode').value;
     const idle = parseFloat(document.getElementById('cfgIdleRelease').value);
     const scaleStartup = document.getElementById('cfgScaleStartup') ? (document.getElementById('cfgScaleStartup').value === 'true') : false;
@@ -1295,6 +1300,7 @@ async function saveSettings() {
         const cfg = await getRes.json();
         cfg.server.host = host;
         cfg.server.port = port;
+        cfg.server.scale_port = (scalePort && scalePort !== port) ? scalePort : null;
         cfg.server.sharing_mode = mode;
         cfg.server.idle_release_seconds = idle;
         cfg.server.enable_scale_at_startup = scaleStartup;
