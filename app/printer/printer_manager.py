@@ -223,19 +223,39 @@ class PrinterManager:
                     self._record_job("PDF", str(printer_name), res)
                     return res
             elif ";base64," in pdf_data:
-                raw_bytes = base64.b64decode(pdf_data.split(";base64,")[1])
+                b64_part = "".join(pdf_data.split(";base64,")[1].split())
+                missing = len(b64_part) % 4
+                if missing:
+                    b64_part += "=" * (4 - missing)
+                raw_bytes = base64.b64decode(b64_part)
             elif pdf_data.startswith("base64:"):
-                raw_bytes = base64.b64decode(pdf_data[7:])
+                b64_part = "".join(pdf_data[7:].split())
+                missing = len(b64_part) % 4
+                if missing:
+                    b64_part += "=" * (4 - missing)
+                raw_bytes = base64.b64decode(b64_part)
             else:
+                # Coba decode sebagai base64 string terlebih dahulu (dengan auto-padding)
+                is_decoded = False
                 try:
-                    raw_bytes = base64.b64decode(pdf_data, validate=True)
+                    b64_clean = "".join(pdf_data.split())
+                    missing = len(b64_clean) % 4
+                    if missing:
+                        b64_clean += "=" * (4 - missing)
+                    decoded = base64.b64decode(b64_clean)
+                    if decoded.startswith(b"%PDF-") or len(b64_clean) > 80:
+                        raw_bytes = decoded
+                        is_decoded = True
                 except Exception:
-                    # Mungkin path berkas lokal
+                    pass
+
+                if not is_decoded:
+                    # Mungkin path berkas lokal di disk
                     try:
-                        with open(pdf_data, "rb") as f:
+                        with open(pdf_data.strip(), "rb") as f:
                             raw_bytes = f.read()
                     except Exception as e:
-                        res = PrintJobResult(success=False, printer=str(printer_name), error=f"Gagal membaca berkas PDF: {e}")
+                        res = PrintJobResult(success=False, printer=str(printer_name), error=f"Gagal membaca data PDF atau berkas: {e}")
                         self._record_job("PDF", str(printer_name), res)
                         return res
         else:

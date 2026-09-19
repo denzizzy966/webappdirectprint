@@ -80,35 +80,232 @@
         </table>
       </div>
 
-      <div class="card">
-        <div class="card-title">Sandbox Pengujian Silent Print (Direct Print)</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-          <!-- Left: Quick Tests -->
-          <div>
-            <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Pilih Target Printer / Pool:</label>
-            <select id="targetPrinterSelect"></select>
+      <div class="card" id="sandboxCard">
+        <div class="card-title">
+          <span>🧪 Sandbox &amp; Console Uji Cetak Silent (Direct Print)</span>
+          <span class="badge badge-primary">Silent Printing</span>
+        </div>
 
-            <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Pengujian Cepat (1-Klik):</label>
-            <div class="btn-group" style="margin-bottom: 1rem;">
-              <button class="btn btn-success" onclick="testPrintReceipt()">🧾 Test Struk ESC/POS</button>
-              <button class="btn" onclick="testPrintZpl()">🏷️ Test Barcode ZPL</button>
-              <button class="btn btn-warning" onclick="testOpenDrawer()">💵 Buka Laci Kasir</button>
+        <!-- Target Printer / Pool Bar -->
+        <div style="display: flex; gap: 1rem; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+          <div style="flex: 1; min-width: 280px;">
+            <label style="font-weight: 600; font-size: 0.85rem; display: block; margin-bottom: 0.4rem; color: var(--text-muted);">🎯 Target Printer / Pool Terpilih:</label>
+            <select id="targetPrinterSelect" style="margin-bottom: 0;"></select>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn btn-secondary" onclick="loadPrinters()" title="Refresh daftar printer">🔄 Refresh Printer</button>
+            <span class="badge badge-success" id="sandboxPrinterStatusBadge">🟢 Siap Cetak</span>
+          </div>
+        </div>
+
+        <!-- Sub-Tabs Navigation for Testing -->
+        <div style="display: flex; gap: 8px; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border); padding-bottom: 8px; flex-wrap: wrap;">
+          <button class="subtab-btn active" id="btnSubtabBase64" onclick="switchSandboxTab('base64')">🏷️ 1. Cetak Base64 PDF (Label 60x25 / JS)</button>
+          <button class="subtab-btn" id="btnSubtabFile" onclick="switchSandboxTab('file')">📄 2. Cetak File / URL PDF (Faktur / Dokumen)</button>
+          <button class="subtab-btn" id="btnSubtabReceipt" onclick="switchSandboxTab('receipt')">🧾 3. Struk Kasir &amp; Barcode ZPL</button>
+          <button class="subtab-btn" id="btnSubtabRaw" onclick="switchSandboxTab('raw')">⚙️ 4. Custom RAW / Teks / Hex</button>
+        </div>
+
+        <!-- 1. SUB-PANEL: BASE64 PDF (LABEL 60X25 / JS) -->
+        <div id="panel-base64" class="sandbox-panel">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-weight: 700; font-size: 1.05rem;">🏷️ Uji Cetak PDF dari Base64 (Format dompdf / jsPDF / Web App)</span>
+              <small style="display: block; color: var(--text-muted); font-size: 0.82rem;">
+                String Base64 langsung dicetak ke printer fisik secara silent tanpa dialog browser. Cocok untuk label barcode, resi thermal, dan stiker 60x25 mm.
+              </small>
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
-              💡 <b>Direct Print (Silent Print)</b> mengirim byte langsung ke spooler printer fisik tanpa membuka dialog browser (<kbd>Ctrl+P</kbd>).
-            </p>
+            <span class="badge badge-primary">Ukuran: 60×25 mm (170×71 pt)</span>
           </div>
 
-          <!-- Right: Custom Payload -->
-          <div>
-            <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Cetak Custom RAW / ZPL / Teks:</label>
-            <textarea id="customRawInput" placeholder="Masukkan teks, ESC/POS byte, atau kode ZPL (^XA^FO50,50^ADN,36,20^FDHalo Dunia^FS^XZ)..."></textarea>
-            <div class="btn-group">
-              <button class="btn" onclick="sendCustomRaw()">🚀 Cetak RAW Langsung</button>
-              <button class="btn btn-secondary" onclick="document.getElementById('customRawInput').value=''">Bersihkan</button>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">String Base64 PDF:</label>
+              <textarea id="sandboxBase64Input" placeholder="Tempelkan string Base64 PDF di sini..." style="font-family: monospace; font-size: 0.75rem; min-height: 180px;"></textarea>
+              
+              <div style="display: flex; gap: 8px; margin-top: 6px; margin-bottom: 12px; flex-wrap: wrap;">
+                <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="loadDefaultBase64Sample()">🔄 Muat Sampel Label 60x25</button>
+                <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="updateSandboxBase64Preview()">👁️ Perbarui Preview</button>
+                <button class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;" onclick="document.getElementById('sandboxBase64Input').value=''">🧹 Bersihkan</button>
+              </div>
+
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 110px;">
+                  <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">DPI Printer</label>
+                  <select id="sandboxBase64Dpi" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <option value="203" selected>203 DPI (Godex/Label)</option>
+                    <option value="300">300 DPI</option>
+                    <option value="600">600 DPI</option>
+                  </select>
+                </div>
+                <div style="flex: 1; min-width: 110px;">
+                  <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Orientasi</label>
+                  <select id="sandboxBase64Orientation" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <option value="auto" selected>Auto</option>
+                    <option value="portrait">Portrait</option>
+                    <option value="landscape">Landscape</option>
+                  </select>
+                </div>
+                <div style="flex: 1; min-width: 110px;">
+                  <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Fit Mode</label>
+                  <select id="sandboxBase64Fit" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <option value="fit_page" selected>Fit Page</option>
+                    <option value="shrink">Shrink to Fit</option>
+                    <option value="none">Original (None)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Preview Visual PDF (Browser Live Preview):</label>
+              <iframe id="sandboxBase64PreviewFrame" style="width: 100%; height: 250px; background: #fff; border-radius: 8px; border: 1px solid var(--border);"></iframe>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">
+                💡 Menampilkan dokumen PDF yang didecode langsung dari string Base64 di sebelah kiri.
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--border);">
+            <button class="btn btn-success" style="padding: 0.65rem 1.4rem; font-size: 0.95rem;" onclick="testPrintBase64Pdf()">
+              🖨️ Cetak Base64 PDF (Silent Print)
+            </button>
+            <button class="btn btn-primary" onclick="testPrintBase64PdfSDK()">
+              ⚡ Cetak via HardwareBridge SDK
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. SUB-PANEL: FILE / URL PDF -->
+        <div id="panel-file" class="sandbox-panel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-weight: 700; font-size: 1.05rem;">📄 Cetak Berkas PDF dari URL atau Berkas Komputer Lokal</span>
+              <small style="display: block; color: var(--text-muted); font-size: 0.82rem;">
+                Kirim URL dokumen atau unggah berkas PDF lokal untuk langsung dikirim ke spooler printer tanpa dialog browser.
+              </small>
+            </div>
+            <span class="badge badge-primary">Faktur / Invoice</span>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">URL Berkas PDF:</label>
+              <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <input type="text" id="sandboxPdfUrlInput" value="/static/sample_invoice.pdf" placeholder="http://... atau /static/..." style="margin-bottom: 0;">
+                <button class="btn btn-secondary" onclick="updateSandboxUrlPreview()">👁️ Preview</button>
+              </div>
+
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Atau Unggah Berkas PDF Lokal dari Komputer:</label>
+              <input type="file" id="sandboxPdfFileInput" accept="application/pdf" onchange="handleSandboxFileUpload(event)" style="margin-bottom: 12px;">
+
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 120px;">
+                  <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">DPI Printer</label>
+                  <select id="sandboxFileDpi" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <option value="203" selected>203 DPI</option>
+                    <option value="300">300 DPI</option>
+                    <option value="600">600 DPI</option>
+                  </select>
+                </div>
+                <div style="flex: 1; min-width: 120px;">
+                  <label style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 4px;">Fit Mode</label>
+                  <select id="sandboxFileFit" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <option value="fit_page" selected>Fit Page</option>
+                    <option value="shrink">Shrink to Fit</option>
+                    <option value="none">Original (None)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Preview Berkas PDF:</label>
+              <iframe id="sandboxUrlPreviewFrame" src="/static/sample_invoice.pdf" style="width: 100%; height: 250px; background: #fff; border-radius: 8px; border: 1px solid var(--border);"></iframe>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">
+                📄 Faktur contoh default <code>/static/sample_invoice.pdf</code> dapat dicetak untuk menguji kejelasan font dan layout.
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--border);">
+            <button class="btn btn-success" style="padding: 0.65rem 1.4rem; font-size: 0.95rem;" onclick="testPrintFilePdf()">
+              🖨️ Cetak Berkas / URL PDF (Silent)
+            </button>
+            <button class="btn btn-secondary" onclick="loadSampleInvoiceToSandbox()">
+              🔄 Reset ke Faktur Contoh
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. SUB-PANEL: STRUK KASIR & BARCODE ZPL -->
+        <div id="panel-receipt" class="sandbox-panel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-weight: 700; font-size: 1.05rem;">🧾 Struk Kasir ESC/POS, Barcode ZPL &amp; Laci Kasir</span>
+              <small style="display: block; color: var(--text-muted); font-size: 0.82rem;">
+                Uji coba instan 1-klik untuk printer thermal POS kasir (Epson, TM-T82, Panda, dsb) dan printer barcode (Godex, Zebra, Xprinter).
+              </small>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1rem;">
+            <div style="background: var(--bg-secondary); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border);">
+              <h4 style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 8px;">🧾 Thermal Receipt (ESC/POS)</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+                Mengirim template struk transaksi belanja ritel dengan pemformatan teks tebal, garis pemisah, dan perintah potong kertas (paper cut).
+              </p>
+              <div class="btn-group">
+                <button class="btn btn-success" onclick="testPrintReceipt()">🧾 Test Cetak Struk ESC/POS</button>
+                <button class="btn btn-warning" onclick="testOpenDrawer()">💵 Buka Laci Kasir (Kick Drawer)</button>
+              </div>
+            </div>
+
+            <div style="background: var(--bg-secondary); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border);">
+              <h4 style="margin-bottom: 0.75rem; display: flex; align-items: center; gap: 8px;">🏷️ Barcode Label (ZPL / Zebra / Godex)</h4>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1rem;">
+                Mengirim kode bahasa printer ZPL II berisi barcode Code 128, teks judul, dan batas kotak stiker.
+              </p>
+              <div class="btn-group">
+                <button class="btn btn-primary" onclick="testPrintZpl()">🏷️ Test Cetak Barcode ZPL</button>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- 4. SUB-PANEL: CUSTOM RAW / HEX / TEKS -->
+        <div id="panel-raw" class="sandbox-panel" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <span style="font-weight: 700; font-size: 1.05rem;">⚙️ Custom RAW Payload / Hex / Perintah Bahasa Printer</span>
+              <small style="display: block; color: var(--text-muted); font-size: 0.82rem;">
+                Kirim data byte mentah, kode ZPL, TSPL, ESC/POS, atau teks murni langsung ke antrian spooler printer tanpa filter.
+              </small>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Payload RAW / Kode Printer:</label>
+              <textarea id="customRawInput" placeholder="Masukkan teks, perintah ESC/POS, atau kode ZPL (^XA^FO50,50^ADN,36,20^FDHalo Dunia^FS^XZ)..." style="min-height: 160px;"></textarea>
+              
+              <div class="btn-group">
+                <button class="btn" onclick="sendCustomRaw()">🚀 Cetak RAW Langsung</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('customRawInput').value=''">Bersihkan</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Pilih Template Siap Pakai:</label>
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                <button class="btn btn-secondary" style="justify-content: flex-start; text-align: left; font-size: 0.82rem;" onclick="loadRawTemplate('zpl')">🏷️ ZPL: Label Barcode Code 128 (Zebra / Godex)</button>
+                <button class="btn btn-secondary" style="justify-content: flex-start; text-align: left; font-size: 0.82rem;" onclick="loadRawTemplate('tspl')">🏷️ TSPL: Label TSC / Xprinter (TEXT &amp; BARCODE)</button>
+                <button class="btn btn-secondary" style="justify-content: flex-start; text-align: left; font-size: 0.82rem;" onclick="loadRawTemplate('escpos')">🧾 ESC/POS: Struk Pembelian Sederhana + Cut</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </section>
 

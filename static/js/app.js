@@ -109,6 +109,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     await bridge.connect();
     loadSystemStatus();
     loadPrinters();
+    initSandboxDirectPrint();
     loadControlPorts();
     loadScales();
     loadPrintHistory();
@@ -211,6 +212,222 @@ async function loadPrinters() {
     }
 }
 
+// ────────────────────────────────────────────────────────────
+// Sandbox & Direct Print Testing Controller
+// ────────────────────────────────────────────────────────────
+
+const SAMPLE_BASE64_PDF = `JVBERi0xLjcKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZwovT3V0bGluZXMgMiAwIFIKL1BhZ2VzIDMgMCBSID4+CmVuZG9iagoyIDAgb2JqCjw8IC9UeXBlIC9PdXRsaW5lcyAvQ291bnQgMCA+PgplbmRvYmoKMyAwIG9iago8PCAvVHlwZSAvUGFnZXMKL0tpZHMgWzYgMCBSCl0KL0NvdW50IDEKL1Jlc291cmNlcyA8PAovUHJvY1NldCA0IDAgUgovRm9udCA8PCAKL0YxIDggMCBSCi9GMiA5IDAgUgovRjMgMTAgMCBSCj4+Ci9YT2JqZWN0IDw8IAovSTEgMTEgMCBSCi9JMiAxMiAwIFIKPj4KPj4KL01lZGlhQm94IFswLjAwMCAwLjAwMCAxNzAuMDc5IDcwLjg2Nl0KID4+CmVuZG9iago0IDAgb2JqClsvUERGIC9UZXh0IC9JbWFnZUMgXQplbmRvYmoKNSAwIG9iago8PAovUHJvZHVjZXIgKP7/AGQAbwBtAHAAZABmACAAMgAuADAALgAzACAAKwAgAEMAUABEAEYpCi9DcmVhdGlvbkRhdGUgKEQ6MjAyNjA5MTgxNTQ1MTUrMDcnMDAnKQovTW9kRGF0ZSAoRDoyMDI2MDkxODE1NDUxNSswNycwMCcpCi9UaXRsZSAo/v8AQwBlAHQAYQBrKQo+PgplbmRvYmoKNiAwIG9iago8PCAvVHlwZSAvUGFnZQovTWVkaWFCb3ggWzAuMDAwIDAuMDAwIDE3MC4wNzkgNzAuODY2XQovUGFyZW50IDMgMCBSCi9Db250ZW50cyA3IDAgUgo+PgplbmRvYmoKNyAwIG9iago8PCAvRmlsdGVyIC9GbGF0ZURlY29kZQovTGVuZ3RoIDE3NSA+PgpzdHJlYW0KeJxtjj8LwkAMxff7FG/UoenlrrleVlGLfxCEgw7ipOgkot9/8FpbdTCBl0Dye4mxZK3Frz6vZpZQRwqVhyhFG5HOKJcOkRzSBThMwmZ6RFpjkczDsAx8To59G0lZ4DOgHqcbypXD/G72nbXUVFmG6zbd29pDyQ7W26bweVJwls+RjFVCaj1YSNiPH32xpkWPYdfiH1o7ZI06HqxJBrKKIYiigHaRq2PlEX8BtyA8NQplbmRzdHJlYW0KZW5kb2JqCjggMCBvYmoKPDwgL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9OYW1lIC9GMQovQmFzZUZvbnQgL1RpbWVzLVJvbWFuCi9FbmNvZGluZyAvV2luQW5zaUVuY29kaW5nCj4+CmVuZG9iago5IDAgb2JqCjw8IC9UeXBlIC9Gb250Ci9TdWJ0eXBlIC9UeXBlMQovTmFtZSAvRjIKL0Jhc2VGb250IC9IZWx2ZXRpY2EtQm9sZAovRW5jb2RpbmcgL1dpbkFuc2lFbmNvZGluZwo+PgplbmRvYmoKMTAgMCBvYmoKPDwgL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9OYW1lIC9GMwovQmFzZUZvbnQgL0hlbHZldGljYQovRW5jb2RpbmcgL1dpbkFuc2lFbmNvZGluZwo+PgplbmRvYmoKMTEgMCBvYmoKPDwKL1R5cGUgL1hPYmplY3QKL1N1YnR5cGUgL0ltYWdlCi9XaWR0aCAyNzEKL0hlaWdodCAyNwovRmlsdGVyIC9GbGF0ZURlY29kZQovRGVjb2RlUGFybXMgPDwgL1ByZWRpY3RvciAxNSAvQ29sb3JzIDEgL0NvbHVtbnMgMjcxIC9CaXRzUGVyQ29tcG9uZW50IDg+PgovQ29sb3JTcGFjZSAvRGV2aWNlR3JheQovQml0c1BlckNvbXBvbmVudCA4Ci9MZW5ndGggNzY+PgpzdHJlYW0KWIXt0EERACAMwLD5Nw3fVQE8EgW9zmGb1wGf8aP8KD/Kj/Kj/Cg/yo/yo/woP8qP8qP8KD/Kj/Kj/Cg/yo/yo/woP8qP8qMuSnF6EAplbmRzdHJlYW0KZW5kb2JqCjEyIDAgb2JqCjw8Ci9UeXBlIC9YT2JqZWN0Ci9TdWJ0eXBlIC9JbWFnZQovV2lkdGggMjcxCi9IZWlnaHQgMjcKL1NNYXNrIDExIDAgUgovRmlsdGVyIC9GbGF0ZURlY29kZQovRGVjb2RlUGFybXMgPDwgL1ByZWRpY3RvciAxNSAvQ29sb3JzIDEgL0NvbHVtbnMgMjcxIC9CaXRzUGVyQ29tcG9uZW50IDg+PgovQ29sb3JTcGFjZSAgWyAvSW5kZXhlZCAvRGV2aWNlUkdCIDI0IDEzIDAgUiBdCi9CaXRzUGVyQ29tcG9uZW50IDgKL0xlbmd0aCA4ODA+PgpzdHJlYW0KWIW9mIt2oyAQhhlTcROlROy2+/5PulwFZLgZG04PxWEYyJd/AEOILiD/htsHGQf5MIygbLpNx2EYyXCztTGGtTJOg6pNWw23/t6BuAja+EfHUe0p6HJjSTCjjXAfvN1EmPSjWw8SwU4BykE9ftgZ3Xr8cBltJFh53B5kfKiG6ZdtULV8lF2Pke4OYW2MqjZtPVz7Bw7EWozRDgkczBA7tZ8xcrB217BxZuWwpBHUFMxGCGeUDp/KjTvjbo8LUIwH2Ve32AnfxuOZ4bHGPJIIIp3CPYqR7OshFR64Pkj0bcmanuZxlxY4rQ+W00cUQVByRE5TfdR5cEI9DyjxMPrs5MH8kmev8zoP7czL+ZKLECDnKQ+zD3z264MfeayL7aKv5ct6wf4hUh4US0lMH9CeL1DSB5YvFOcBMQ/hPo24cj9t0AfCgx/yBZSlRR9NPHL64J37Kbefhnkec8hD2RecB4t4zAUetHU/5bIfMB4C58FTHqKeL7y0n9KjPqBfH/p8War5UucR6gMu0ceRx9R7/4DAAXryxaYku4pHIV/YeR6t9w+fLzxIh5THIk+uc/vHkQdFeTzxfOnQx3PZeYgKD3XBk6dMUR+RQ8Rjre2nT3cBQ3nQjD4iLpfvp2TyRpbqYzp9vggzVscRPfqA/nzhNR68ncdc0EeaLyzi8ZnwmLP7R/n9BbmPkdb72LoU9CF69fGG97kL9o+lZT/l+XzhJ3hAhkdG7fqRxQ55HhBFmJIr34HHHckXbEN14anTB8N5NOsjvI8tCA/6Bn3wvD6Ww/4BJX1g+dLEg6b6WI758jSr0Dc6/TvDY+UIj7XCA3l/OXne1vMl4gEdPPr2DzRfxAX6uLtEqPGgO4/oFYbX9eF/H+O2i73Mw3XNzfkyX76ftugDMvkCmD6gkceqI//6+XJ8RYILeKjd5bX7mH134J4HC99fJudwlgfdBU/Mj2/h+XKJPravjWybamzmeTO1/L/91bVzMDXfNu5Gqdq0dadsKJctMH59/0j7P2KdN+PwbRxscCBmVBpht/+4xh7HBLcRSDrFFj269fjhzk7QH0EOJfUojbEnFvp21FAgPfPyq0w966W2sOaYNtBxZa3jzwL6rWilCC3RadJ4qdRl2RRBL+aMTPZy7feUK11Z0/h5WtywXGsOTtWfbPwHSDxzZwplbmRzdHJlYW0KZW5kb2JqCjEzIDAgb2JqCjw8IC9GaWx0ZXIgL0ZsYXRlRGVjb2RlCi9MZW5ndGggNjUgPj4Kc3RyZWFtCnicDYoBDQAxDAKZjc5LcTYcdiZWG98nJOS4MDPfTESQ3BGSvKUT2yYBHAlYTpL+MqmjBXR3Vd2qfsbn+gH7qiVRCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDE0CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDc0IDAwMDAwIG4gCjAwMDAwMDAxMjAgMDAwMDAgbiAKMDAwMDAwMDMzMiAwMDAwMCBuIAowMDAwMDAwMzY5IDAwMDAwIG4gCjAwMDAwMDA1NDAgMDAwMDAgbiAKMDAwMDAwMDY0MiAwMDAwMCBuIAowMDAwMDAwODg5IDAwMDAwIG4gCjAwMDAwMDA5OTggMDAwMDAgbiAKMDAwMDAwMTExMCAwMDAwMCBuIAowMDAwMDAxMjE4IDAwMDAwIG4gCjAwMDAwMDE1MzcgMDAwMDAgbiAKMDAwMDAwMjY5OCAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9TaXplIDE0Ci9Sb290IDEgMCBSCi9JbmZvIDUgMCBSCi9JRFs8ZGFiNzcxMTYzMmQ5NTc0NDlhMDUyNTI3N2FmOGY3Nzg+PGRhYjc3MTE2MzJkOTU3NDQ5YTA1MjUyNzdhZjhmNzc4Pl0KPj4Kc3RhcnR4cmVmCjI4MzUKJSVFT0YK`.trim();
+
+function switchSandboxTab(tabName) {
+    document.querySelectorAll('.subtab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.sandbox-panel').forEach(p => p.style.display = 'none');
+
+    const targetBtn = document.getElementById(`btnSubtab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`);
+    if (targetBtn) targetBtn.classList.add('active');
+
+    const targetPanel = document.getElementById(`panel-${tabName}`);
+    if (targetPanel) targetPanel.style.display = 'block';
+}
+
+function initSandboxDirectPrint() {
+    loadDefaultBase64Sample();
+}
+
+function loadDefaultBase64Sample() {
+    const input = document.getElementById('sandboxBase64Input');
+    if (input) {
+        input.value = SAMPLE_BASE64_PDF;
+        updateSandboxBase64Preview();
+    }
+}
+
+function updateSandboxBase64Preview() {
+    const frame = document.getElementById('sandboxBase64PreviewFrame');
+    const input = document.getElementById('sandboxBase64Input');
+    if (!frame || !input) return;
+
+    let b64 = input.value.trim();
+    if (!b64) {
+        frame.src = 'about:blank';
+        return;
+    }
+
+    if (b64.includes(';base64,')) {
+        b64 = b64.split(';base64,')[1];
+    } else if (b64.startsWith('base64:')) {
+        b64 = b64.substring(7);
+    }
+    b64 = b64.replace(/\s+/g, '');
+    frame.src = `data:application/pdf;base64,${b64}`;
+}
+
+async function testPrintBase64Pdf() {
+    const printer = document.getElementById('targetPrinterSelect').value;
+    const b64 = document.getElementById('sandboxBase64Input').value.trim();
+    const dpi = parseInt(document.getElementById('sandboxBase64Dpi').value, 10) || 203;
+    const orientation = document.getElementById('sandboxBase64Orientation').value || 'auto';
+    const fit = document.getElementById('sandboxBase64Fit').value || 'fit_page';
+
+    if (!b64) {
+        alert('Data string Base64 PDF tidak boleh kosong!');
+        return;
+    }
+
+    addLog(`🖨️ Mengirim Base64 PDF (${b64.length} karakter) ke printer: ${printer} (DPI: ${dpi}, Fit: ${fit})...`);
+    try {
+        const res = await fetch('/api/print/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                printer: printer,
+                pdf_data: b64,
+                dpi: dpi,
+                orientation: orientation,
+                fit: fit,
+                doc_name: 'Test_Label_Base64'
+            })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            addLog(`✅ Cetak Base64 PDF Berhasil! Spooled ke "${json.result.printer}" (${json.result.bytes_sent || 'OK'} bytes)`, 'success');
+        } else {
+            addLog(`❌ Cetak Base64 PDF Gagal: ${json.detail || json.message || JSON.stringify(json)}`, 'error');
+        }
+        loadPrintHistory();
+    } catch (e) {
+        addLog(`❌ Error cetak Base64 PDF: ${e.message}`, 'error');
+    }
+}
+
+async function testPrintBase64PdfSDK() {
+    if (!bridge) {
+        alert('HardwareBridge SDK belum siap!');
+        return;
+    }
+    const printer = document.getElementById('targetPrinterSelect').value;
+    const b64 = document.getElementById('sandboxBase64Input').value.trim();
+    const dpi = parseInt(document.getElementById('sandboxBase64Dpi').value, 10) || 203;
+    const orientation = document.getElementById('sandboxBase64Orientation').value || 'auto';
+    const fit = document.getElementById('sandboxBase64Fit').value || 'fit_page';
+
+    if (!b64) {
+        alert('Data string Base64 PDF tidak boleh kosong!');
+        return;
+    }
+
+    addLog(`⚡ Mengirim Base64 PDF via HardwareBridge JS SDK ke: ${printer}...`);
+    try {
+        const res = await bridge.printPdf({
+            printer: printer,
+            pdf_data: b64,
+            dpi: dpi,
+            orientation: orientation,
+            fit: fit,
+            doc_name: 'Test_SDK_Label'
+        });
+        if (res.success || res.status === 'success') {
+            addLog(`✅ [SDK] Cetak Base64 Berhasil! Printer: ${res.printer || printer}`, 'success');
+        } else {
+            addLog(`❌ [SDK] Cetak Base64 Gagal: ${res.error || res.message}`, 'error');
+        }
+        loadPrintHistory();
+    } catch (e) {
+        addLog(`❌ [SDK] Error: ${e.message}`, 'error');
+    }
+}
+
+function updateSandboxUrlPreview() {
+    const url = document.getElementById('sandboxPdfUrlInput').value.trim();
+    const frame = document.getElementById('sandboxUrlPreviewFrame');
+    if (frame && url) {
+        frame.src = url;
+    }
+}
+
+function loadSampleInvoiceToSandbox() {
+    const input = document.getElementById('sandboxPdfUrlInput');
+    if (input) {
+        input.value = '/static/sample_invoice.pdf';
+        updateSandboxUrlPreview();
+    }
+}
+
+function handleSandboxFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    addLog(`📁 Membaca berkas lokal: ${file.name} (${Math.round(file.size / 1024)} KB)...`);
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        const b64 = dataUrl.split(',')[1];
+        
+        // Pindahkan ke editor Base64 dan switch tab
+        const b64Input = document.getElementById('sandboxBase64Input');
+        if (b64Input) {
+            b64Input.value = b64;
+            updateSandboxBase64Preview();
+        }
+        switchSandboxTab('base64');
+        addLog(`✅ Berkas ${file.name} berhasil dimuat ke tab Base64 PDF. Siap dicetak!`, 'success');
+    };
+    reader.readAsDataURL(file);
+}
+
+async function testPrintFilePdf() {
+    const printer = document.getElementById('targetPrinterSelect').value;
+    const url = document.getElementById('sandboxPdfUrlInput').value.trim();
+    const dpi = parseInt(document.getElementById('sandboxFileDpi').value, 10) || 203;
+    const fit = document.getElementById('sandboxFileFit').value || 'fit_page';
+
+    if (!url) {
+        alert('URL berkas PDF tidak boleh kosong!');
+        return;
+    }
+
+    let fullUrl = url;
+    if (url.startsWith('/')) {
+        fullUrl = window.location.origin + url;
+    }
+
+    addLog(`🖨️ Mengirim berkas PDF (${fullUrl}) ke printer: ${printer}...`);
+    try {
+        const res = await fetch('/api/print/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                printer: printer,
+                pdf_data: fullUrl,
+                dpi: dpi,
+                fit: fit,
+                doc_name: 'Test_Invoice_Doc'
+            })
+        });
+        const json = await res.json();
+        if (json.status === 'success') {
+            addLog(`✅ Cetak PDF Dokumen Berhasil! Spooled ke "${json.result.printer}"`, 'success');
+        } else {
+            addLog(`❌ Cetak PDF Gagal: ${json.detail || json.message}`, 'error');
+        }
+        loadPrintHistory();
+    } catch (e) {
+        addLog(`❌ Error cetak berkas PDF: ${e.message}`, 'error');
+    }
+}
+
+function loadRawTemplate(type) {
+    const input = document.getElementById('customRawInput');
+    if (!input) return;
+
+    if (type === 'zpl') {
+        input.value = `^XA\n^FO50,50^ADN,36,20^FDHARDWARE BRIDGE UNIVERSAL^FS\n^FO50,100^BY3\n^BCN,100,Y,N,N\n^FD1234567890^FS\n^FO50,230^ADN,18,10^FDTanggal: 19/09/2026 - Godex / Zebra OK^FS\n^XZ`;
+    } else if (type === 'tspl') {
+        input.value = `SIZE 60 mm, 25 mm\nGAP 2 mm, 0 mm\nDIRECTION 1\nCLS\nTEXT 50,30,"3",0,1,1,"PRODUK PILIHAN"\nBARCODE 50,70,"128",60,1,0,2,2,"PRD-998877"\nPRINT 1\n`;
+    } else if (type === 'escpos') {
+        input.value = `\x1b\x40\x1b\x61\x01\x1d\x21\x11TOKO REJEKI JAYA\n\x1d\x21\x00Jl. Pahlawan No. 123\n--------------------------------\n1x Kopi Latte          25.000\n1x Roti Bakar          18.000\n--------------------------------\nTOTAL:                 43.000\n\x1b\x61\x01Terima Kasih!\n\n\n\x1d\x56\x42\x00`;
+    }
+}
+
 async function testPrintReceipt() {
     const printer = document.getElementById('targetPrinterSelect').value;
     addLog(`Mengirim pengujian struk thermal ESC/POS ke: ${printer}...`);
@@ -292,8 +509,11 @@ async function sendCustomRaw() {
 }
 
 function testPrintSpecific(printerName) {
-    document.getElementById('targetPrinterSelect').value = printerName;
-    testPrintReceipt();
+    const sel = document.getElementById('targetPrinterSelect');
+    if (sel) sel.value = printerName;
+    const sandbox = document.getElementById('sandboxCard');
+    if (sandbox) sandbox.scrollIntoView({ behavior: 'smooth' });
+    addLog(`🎯 Target pengujian diarahkan ke printer: ${printerName}`);
 }
 
 // ────────────────────────────────────────────────────────────

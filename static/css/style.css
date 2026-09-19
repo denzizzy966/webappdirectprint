@@ -94,6 +94,32 @@ header {
   color: white;
 }
 
+.subtab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.subtab-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.subtab-btn.active {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
 .container {
   max-width: 1200px;
   width: 100%;
