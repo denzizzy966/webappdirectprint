@@ -9,13 +9,18 @@ saya ubah jadi Base64, lalu saya kirim ke direct print."**
 
 > ⛔ **HTML mentah yang di-Base64-kan TIDAK bisa dicetak lewat `/api/print/pdf`.**
 
-`/api/print/pdf` meneruskan hasil decode Base64 ke PyMuPDF dengan
-`filetype="pdf"`. Bila isinya HTML, PyMuPDF gagal membukanya dan bridge
-mengembalikan HTTP 500:
+Bridge memeriksa empat byte pertama hasil decode. Bila bukan `%PDF-`, permintaan
+ditolak dengan HTTP 500 dan pesan yang menyebut penyebabnya:
 
 ```
-Gagal mencetak PDF ke 'Godex G500 GZPL': Failed to open stream
+Data yang dikirim adalah HTML, bukan PDF. Render HTML menjadi PDF terlebih
+dahulu (dompdf, html2pdf.js, atau jsPDF), baru kirim Base64 hasilnya.
 ```
+
+Pemeriksaan ini sengaja ada karena PyMuPDF versi baru diam-diam ikut merender
+HTML pada halaman bawaan 400 × 600 pt — ukuran yang tidak ada hubungannya dengan
+label 60 × 25 mm, sehingga hasil cetaknya pasti salah. Lebih baik ditolak dengan
+jelas daripada menghabiskan gulungan label.
 
 Contoh yang **SALAH**:
 
@@ -33,6 +38,11 @@ HTML harus **dirender** menjadi salah satu format yang dimengerti bridge:
 | HTML → **PDF** (di server Laravel/PHP) | `/api/print/pdf` (Base64 atau URL) | Dokumen resmi, arsip, cetak ulang |
 | HTML → **PNG** (canvas) | `/api/print/image` | Struk/label sederhana, tampilan harus sama persis dengan layar |
 | Teks → **ESC/POS** | `/api/print/raw` | Struk kasir thermal (paling cepat & paling hemat) |
+
+> 🏷️ **Printer label (Godex GZPL, Zebra)?** Setelah HTML menjadi PDF, kirim
+> dengan `options: { mode: "zpl", dpi: 203 }` supaya PDF-nya diubah menjadi
+> perintah ZPL raster dan dikirim lewat jalur RAW — jalur yang jauh lebih andal
+> pada printer label. Lihat [08-printer-label-zpl.md](08-printer-label-zpl.md).
 
 ---
 

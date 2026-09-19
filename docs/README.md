@@ -13,6 +13,7 @@ di dalam paket portable).
 | "Saya ingin langsung mencetak dari aplikasi web saya" | [direct-print/](direct-print/) |
 | "Kirim HTML yang dikonversi ke Base64 ke printer" | [direct-print/02-html-ke-base64.md](direct-print/02-html-ke-base64.md) |
 | "Cetak PDF dari `http://192.168.3.25/produksi/ProduksiPDF/...`" | [direct-print/03-pdf-dari-url.md](direct-print/03-pdf-dari-url.md) |
+| "PDF gagal dicetak di printer label Godex / Zebra" | [direct-print/08-printer-label-zpl.md](direct-print/08-printer-label-zpl.md) |
 | "Bagaimana cara memasang bridge di PC kasir?" | [03-instalasi.md](03-instalasi.md) |
 | "Kenapa harus dipasang di PC klien, bukan di server?" | [01-arsitektur.md](01-arsitektur.md) |
 | "Saya mau membaca timbangan digital dari browser" | [06-timbangan-serial.md](06-timbangan-serial.md) |
@@ -47,6 +48,7 @@ di dalam paket portable).
 | [direct-print/05-printer-target-pool.md](direct-print/05-printer-target-pool.md) | Memilih printer: nama fisik, alias pool, urutan resolusi |
 | [direct-print/06-referensi-api-print.md](direct-print/06-referensi-api-print.md) | Referensi payload & respons endpoint cetak |
 | [direct-print/07-troubleshooting-print.md](direct-print/07-troubleshooting-print.md) | Daftar galat cetak beserta solusinya |
+| [direct-print/08-printer-label-zpl.md](direct-print/08-printer-label-zpl.md) | **Mode ZPL Raster** untuk printer label Godex / Zebra |
 
 ### 🔌 Integrasi
 
@@ -76,7 +78,8 @@ webappdirectprint/
 │   │   ├── routes_http.py     Seluruh endpoint REST /api/*
 │   │   └── routes_ws.py       WebSocket /ws (kompatibel whb_print.js)
 │   ├── printer/
-│   │   ├── printer_manager.py Resolusi printer & deteksi format data
+│   │   ├── printer_manager.py Resolusi printer, format data, pemilihan mode
+│   │   ├── pdf_to_zpl.py      Konversi PDF/gambar menjadi ZPL raster ^GFA
 │   │   ├── win_spooler.py     Windows: Win32 Spooler + PyMuPDF + GDI
 │   │   ├── cups_linux.py      Linux: perintah lp / CUPS
 │   │   ├── network_socket.py  Printer jaringan TCP 9100

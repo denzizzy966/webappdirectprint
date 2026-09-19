@@ -19,6 +19,7 @@ Seluruh dokumentasi terkumpul di folder **[`docs/`](docs/)**.
 | &nbsp;&nbsp;↳ HTML dikonversi ke Base64 lalu dicetak | [docs/direct-print/02-html-ke-base64.md](docs/direct-print/02-html-ke-base64.md) |
 | &nbsp;&nbsp;↳ Cetak PDF dari URL server (mis. `192.168.3.25/produksi/ProduksiPDF/`) | [docs/direct-print/03-pdf-dari-url.md](docs/direct-print/03-pdf-dari-url.md) |
 | &nbsp;&nbsp;↳ ESC/POS, ZPL, TSPL, laci kasir | [docs/direct-print/04-raw-escpos-zpl.md](docs/direct-print/04-raw-escpos-zpl.md) |
+| &nbsp;&nbsp;↳ **PDF gagal di printer label? Mode ZPL Raster** | [docs/direct-print/08-printer-label-zpl.md](docs/direct-print/08-printer-label-zpl.md) |
 | 🏗️ Arsitektur (kenapa di PC klien) | [docs/01-arsitektur.md](docs/01-arsitektur.md) |
 | 📦 Instalasi & deployment | [docs/03-instalasi.md](docs/03-instalasi.md) |
 | ⚙️ Referensi `bridge_config.json` | [docs/04-konfigurasi.md](docs/04-konfigurasi.md) |

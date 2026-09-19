@@ -32,13 +32,64 @@ class PrintRawRequest(BaseModel):
     data: str = Field(..., description="Data yang akan dicetak (teks langsung, base64:..., atau hex)")
     doc_name: Optional[str] = "DirectPrint_Raw"
 
+# Kunci opsi render yang juga diterima di level atas JSON, demi kompatibilitas
+# dengan klien lama (whb_print.js, printService.submit) dan dashboard sandbox.
+RENDER_OPTION_KEYS = (
+    "mode", "render", "render_mode", "dpi", "qty", "threshold", "dither",
+    "darkness", "speed", "rotate", "offset_x", "offset_y",
+    "orientation", "fit", "label_width_dots",
+)
+
+
+def merge_render_options(req: BaseModel) -> Dict[str, Any]:
+    """
+    Menggabungkan `options` dengan field render di level atas JSON.
+
+    Field di level atas dipakai hanya bila kunci yang sama belum ada di
+    `options`, sehingga `options` tetap menjadi sumber kebenaran.
+    """
+    opts: Dict[str, Any] = dict(getattr(req, "options", None) or {})
+    for key in RENDER_OPTION_KEYS:
+        nilai = getattr(req, key, None)
+        if nilai is not None and key not in opts:
+            opts[key] = nilai
+    return opts
+
+
 class PrintPdfRequest(BaseModel):
     printer: Optional[str] = None
     target: Optional[str] = None
     pool: Optional[str] = None
-    pdf_data: str = Field(..., description="Data PDF dalam format base64, URL (http://...), atau path berkas")
-    doc_name: Optional[str] = "DirectPrint_PDF"
+    pdf_data: Optional[str] = Field(None, description="Data PDF dalam format base64, URL (http://...), atau path berkas")
+    file_content: Optional[str] = Field(None, description="Alias pdf_data (kompatibel whb_print.js / printService.submit)")
+    url: Optional[str] = Field(None, description="Alias doc_name / sumber PDF (kompatibel whb_print.js)")
+    doc_name: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+    # Opsi render yang boleh dikirim di level atas
+    mode: Optional[str] = Field(None, description="auto (bawaan) | driver | zpl")
+    render: Optional[str] = None
+    render_mode: Optional[str] = None
+    dpi: Optional[int] = None
+    qty: Optional[int] = None
+    threshold: Optional[int] = None
+    dither: Optional[bool] = None
+    darkness: Optional[int] = None
+    speed: Optional[int] = None
+    rotate: Optional[str] = None
+    offset_x: Optional[int] = None
+    offset_y: Optional[int] = None
+    orientation: Optional[str] = None
+    fit: Optional[str] = None
+    label_width_dots: Optional[int] = None
+
+    def resolve_source(self) -> str:
+        """Mengambil sumber PDF dari pdf_data, file_content, atau url."""
+        for kandidat in (self.pdf_data, self.file_content):
+            if kandidat and kandidat.strip():
+                return kandidat
+        if self.url and self.url.strip().lower().startswith(("http://", "https://")):
+            return self.url
+        return ""
 
 class PrintImageRequest(BaseModel):
     printer: Optional[str] = None
@@ -46,6 +97,20 @@ class PrintImageRequest(BaseModel):
     pool: Optional[str] = None
     image_data: str = Field(..., description="Data gambar (base64 string)")
     doc_name: Optional[str] = "DirectPrint_Image"
+    options: Optional[Dict[str, Any]] = None
+    mode: Optional[str] = None
+    render: Optional[str] = None
+    render_mode: Optional[str] = None
+    dpi: Optional[int] = None
+    qty: Optional[int] = None
+    threshold: Optional[int] = None
+    dither: Optional[bool] = None
+    darkness: Optional[int] = None
+    speed: Optional[int] = None
+    rotate: Optional[str] = None
+    offset_x: Optional[int] = None
+    offset_y: Optional[int] = None
+    label_width_dots: Optional[int] = None
 
 class CashDrawerRequest(BaseModel):
     printer: Optional[str] = None
@@ -155,18 +220,74 @@ def print_raw_job(req: PrintRawRequest):
 
 @router.post("/print/pdf")
 def print_pdf_job(req: PrintPdfRequest):
-    """Mencetak berkas PDF (Base64 atau URL) langsung ke printer secara silent."""
+    """
+    Mencetak berkas PDF (Base64 atau URL) langsung ke printer secara silent.
+
+    `options.mode` menentukan cara pencetakan:
+      - `auto`   : jalur driver, kecuali printer terdeteksi memakai ZPL (bawaan)
+      - `driver` : paksa jalur driver grafis (Windows GDI / CUPS)
+      - `zpl`    : paksa konversi PDF menjadi ZPL raster ^GFA lalu kirim RAW
+    """
+    sumber = req.resolve_source()
+    if not sumber:
+        raise HTTPException(
+            status_code=422,
+            detail="Data PDF kosong. Isi salah satu dari: pdf_data, file_content, atau url."
+        )
+
     target_p = req.printer or req.target or req.pool
-    res = printer_manager.print_pdf(target_p, req.pdf_data, doc_name=req.doc_name or "HardwareBridge_PDF", options=req.options)
+    doc_name = req.doc_name or req.url or "HardwareBridge_PDF"
+    res = printer_manager.print_pdf(
+        target_p, sumber, doc_name=doc_name, options=merge_render_options(req)
+    )
     if not res.success:
         raise HTTPException(status_code=500, detail=res.error or "Gagal mencetak PDF")
     return {"status": "success", "result": res.to_dict()}
+
+@router.post("/print/pdf-to-zpl")
+def convert_pdf_to_zpl(req: PrintPdfRequest):
+    """
+    Mengubah PDF menjadi perintah ZPL raster (^GFA) TANPA mencetak.
+
+    Berguna untuk pratinjau, penelusuran masalah, atau bila perintah ZPL-nya
+    ingin dikirim sendiri lewat jalur RAW yang sudah terbukti jalan.
+    """
+    from ..printer.pdf_to_zpl import ZplConversionError, pdf_to_zpl
+
+    sumber = req.resolve_source()
+    if not sumber:
+        raise HTTPException(
+            status_code=422,
+            detail="Data PDF kosong. Isi salah satu dari: pdf_data, file_content, atau url."
+        )
+
+    try:
+        pdf_bytes = printer_manager.load_pdf_bytes(sumber)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        zpl = pdf_to_zpl(pdf_bytes, merge_render_options(req))
+    except ZplConversionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    teks = zpl.decode("ascii")
+    return {
+        "status": "success",
+        "labels": teks.count("^XA"),
+        "pdf_bytes": len(pdf_bytes),
+        "zpl_bytes": len(zpl),
+        "zpl": teks,
+    }
 
 @router.post("/print/image")
 def print_image_job(req: PrintImageRequest):
     """Mencetak gambar (Base64) langsung ke printer."""
     target_p = req.printer or req.target or req.pool
-    res = printer_manager.print_image(target_p, req.image_data, doc_name=req.doc_name or "HardwareBridge_Image")
+    res = printer_manager.print_image(
+        target_p, req.image_data, doc_name=req.doc_name or "HardwareBridge_Image",
+        options=merge_render_options(req)
+    )
     if not res.success:
         raise HTTPException(status_code=500, detail=res.error or "Gagal mencetak gambar")
     return {"status": "success", "result": res.to_dict()}

@@ -10,6 +10,7 @@ import requests
 from .base import PrinterBackend, PrinterInfo, PrintJobResult
 from .escpos_builder import EscPosBuilder
 from .network_socket import print_network_raw
+from .pdf_to_zpl import ZplConversionError, image_to_zpl, is_zpl_printer, pdf_to_zpl
 from ..config import config_manager
 
 logger = logging.getLogger("printer_manager")
@@ -146,6 +147,95 @@ class PrinterManager:
                 return np
         return None
 
+    def get_printer_info(self, printer_name: str) -> Optional[PrinterInfo]:
+        """Mencari metadata printer (driver, port) berdasarkan nama fisiknya."""
+        if not printer_name:
+            return None
+        for p in self.list_printers():
+            if p.name == printer_name:
+                return p
+        low = printer_name.lower()
+        for p in self.list_printers():
+            if low in p.name.lower():
+                return p
+        return None
+
+    def printer_uses_zpl(self, printer_name: str) -> bool:
+        """Menebak apakah printer tujuan memakai bahasa ZPL (Godex GZPL, Zebra, dsb)."""
+        info = self.get_printer_info(printer_name)
+        if info:
+            return is_zpl_printer(info.name, info.driver, info.port)
+        return is_zpl_printer(printer_name)
+
+    @staticmethod
+    def _resolve_render_mode(options: Optional[Dict[str, Any]]) -> str:
+        """Membaca mode render dari options: auto (bawaan), driver, atau zpl."""
+        opts = options or {}
+        mode = opts.get("mode") or opts.get("render") or opts.get("render_mode") or "auto"
+        mode = str(mode).strip().lower()
+        if mode in ("zpl", "zpl_raster", "raster", "gfa"):
+            return "zpl"
+        if mode in ("driver", "gdi", "spooler", "native"):
+            return "driver"
+        return "auto"
+
+    def load_pdf_bytes(self, pdf_data: Any) -> bytes:
+        """
+        Membaca sumber PDF menjadi byte mentah.
+
+        Menerima bytes, URL http(s), data URI base64, prefiks `base64:`,
+        base64 polos, atau path berkas lokal.
+
+        Melempar ValueError dengan pesan yang siap ditampilkan bila gagal.
+        """
+        if isinstance(pdf_data, bytes):
+            return pdf_data
+        if not isinstance(pdf_data, str):
+            raise ValueError("Format data PDF tidak valid.")
+
+        if pdf_data.startswith("http://") or pdf_data.startswith("https://"):
+            try:
+                resp = requests.get(pdf_data, timeout=15)
+                resp.raise_for_status()
+                return resp.content
+            except Exception as e:
+                raise ValueError(f"Gagal mengunduh PDF dari URL: {e}") from e
+
+        if ";base64," in pdf_data:
+            hasil = self._decode_base64(pdf_data.split(";base64,")[1])
+            if hasil is None:
+                raise ValueError("Data URI base64 tidak dapat di-decode.")
+            return hasil
+
+        if pdf_data.startswith("base64:"):
+            hasil = self._decode_base64(pdf_data[7:])
+            if hasil is None:
+                raise ValueError("String setelah prefiks 'base64:' tidak dapat di-decode.")
+            return hasil
+
+        b64_clean = "".join(pdf_data.split())
+        decoded = self._decode_base64(b64_clean)
+        if decoded is not None and (decoded.startswith(b"%PDF-") or len(b64_clean) > 80):
+            return decoded
+
+        try:
+            with open(pdf_data.strip(), "rb") as f:
+                return f.read()
+        except Exception as e:
+            raise ValueError(f"Gagal membaca data PDF atau berkas: {e}") from e
+
+    @staticmethod
+    def _decode_base64(payload: str) -> Optional[bytes]:
+        """Decode base64 dengan pembuangan spasi dan penambalan padding otomatis."""
+        try:
+            bersih = "".join(payload.split())
+            kurang = len(bersih) % 4
+            if kurang:
+                bersih += "=" * (4 - kurang)
+            return base64.b64decode(bersih)
+        except Exception:
+            return None
+
     def _record_job(self, job_type: str, printer: str, result: PrintJobResult):
         self._job_counter += 1
         self.job_history.append({
@@ -187,89 +277,94 @@ class PrinterManager:
             return res
 
         target_printer = self.resolve_printer(printer_name, job_type="raw")
+        res, jalur = self._send_raw(target_printer, raw_bytes, doc_name)
+        self._record_job("RAW (Network)" if jalur == "network" else "RAW", target_printer, res)
+        return res
 
-        # Cek apakah target adalah printer jaringan
+    def _send_raw(self, target_printer: str, raw_bytes: bytes, doc_name: str):
+        """
+        Mengirim byte mentah ke printer tanpa mencatat riwayat job.
+
+        Mengembalikan pasangan (PrintJobResult, jalur) dengan jalur bernilai
+        "network" atau "spooler". Dipakai bersama oleh print_raw dan jalur
+        konversi PDF/gambar ke ZPL.
+        """
         net_p = self._find_network_printer(target_printer)
         if net_p:
             res = print_network_raw(net_p["ip"], int(net_p.get("port", 9100)), raw_bytes)
-            self._record_job("RAW (Network)", target_printer, res)
-            return res
+            return res, "network"
 
         if not self.backend:
-            res = PrintJobResult(success=False, printer=target_printer, error="Backend printer tidak aktif.")
-            self._record_job("RAW", target_printer, res)
-            return res
+            return PrintJobResult(
+                success=False, printer=target_printer, error="Backend printer tidak aktif."
+            ), "spooler"
 
-        res = self.backend.print_raw(target_printer, raw_bytes, doc_name=doc_name)
-        self._record_job("RAW", target_printer, res)
-        return res
+        return self.backend.print_raw(target_printer, raw_bytes, doc_name=doc_name), "spooler"
 
     def print_pdf(self, printer_name: Optional[str], pdf_data: Any, doc_name: str = "HardwareBridge_PDF", options: Optional[Dict[str, Any]] = None) -> PrintJobResult:
         """
         Mencetak PDF secara silent.
-        `pdf_data` bisa berupa bytes, base64 string, atau URL berkas PDF.
-        """
-        raw_bytes: bytes
-        if isinstance(pdf_data, bytes):
-            raw_bytes = pdf_data
-        elif isinstance(pdf_data, str):
-            if pdf_data.startswith("http://") or pdf_data.startswith("https://"):
-                try:
-                    resp = requests.get(pdf_data, timeout=15)
-                    resp.raise_for_status()
-                    raw_bytes = resp.content
-                except Exception as e:
-                    res = PrintJobResult(success=False, printer=str(printer_name), error=f"Gagal mengunduh PDF dari URL: {e}")
-                    self._record_job("PDF", str(printer_name), res)
-                    return res
-            elif ";base64," in pdf_data:
-                b64_part = "".join(pdf_data.split(";base64,")[1].split())
-                missing = len(b64_part) % 4
-                if missing:
-                    b64_part += "=" * (4 - missing)
-                raw_bytes = base64.b64decode(b64_part)
-            elif pdf_data.startswith("base64:"):
-                b64_part = "".join(pdf_data[7:].split())
-                missing = len(b64_part) % 4
-                if missing:
-                    b64_part += "=" * (4 - missing)
-                raw_bytes = base64.b64decode(b64_part)
-            else:
-                # Coba decode sebagai base64 string terlebih dahulu (dengan auto-padding)
-                is_decoded = False
-                try:
-                    b64_clean = "".join(pdf_data.split())
-                    missing = len(b64_clean) % 4
-                    if missing:
-                        b64_clean += "=" * (4 - missing)
-                    decoded = base64.b64decode(b64_clean)
-                    if decoded.startswith(b"%PDF-") or len(b64_clean) > 80:
-                        raw_bytes = decoded
-                        is_decoded = True
-                except Exception:
-                    pass
 
-                if not is_decoded:
-                    # Mungkin path berkas lokal di disk
-                    try:
-                        with open(pdf_data.strip(), "rb") as f:
-                            raw_bytes = f.read()
-                    except Exception as e:
-                        res = PrintJobResult(success=False, printer=str(printer_name), error=f"Gagal membaca data PDF atau berkas: {e}")
-                        self._record_job("PDF", str(printer_name), res)
-                        return res
-        else:
-            res = PrintJobResult(success=False, printer=str(printer_name), error="Format data PDF tidak valid.")
+        `pdf_data` bisa berupa bytes, base64 string, URL, atau path berkas.
+
+        `options["mode"]` menentukan jalur pencetakan:
+          - "auto"   : jalur driver, kecuali printer terdeteksi memakai ZPL (bawaan)
+          - "driver" : paksa jalur driver grafis (Windows GDI / CUPS)
+          - "zpl"    : paksa konversi PDF menjadi ZPL raster ^GFA lalu kirim RAW
+        """
+        try:
+            raw_bytes = self.load_pdf_bytes(pdf_data)
+        except ValueError as e:
+            res = PrintJobResult(success=False, printer=str(printer_name), error=str(e))
             self._record_job("PDF", str(printer_name), res)
             return res
 
         target_printer = self.resolve_printer(printer_name, job_type="pdf")
+        options = dict(options or {})
+        mode = self._resolve_render_mode(options)
+        qty = max(1, int(options.get("qty", 1) or 1))
+
+        # ── Jalur ZPL raster: PDF diubah menjadi ^GFA lalu dikirim sebagai RAW ──
+        # Dipakai oleh printer label (Godex GZPL, Zebra) yang gagal atau tidak
+        # akurat bila dicetak lewat driver grafis Windows.
+        pakai_zpl = mode == "zpl" or (mode == "auto" and self.printer_uses_zpl(target_printer))
+
+        if pakai_zpl:
+            try:
+                zpl_bytes = pdf_to_zpl(raw_bytes, options)
+                res, jalur = self._send_raw(target_printer, zpl_bytes, doc_name)
+                if res.success:
+                    res.message = (
+                        f"PDF dicetak sebagai ZPL raster ({len(zpl_bytes)} byte, "
+                        f"{options.get('dpi') or 203} dpi)"
+                    )
+                self._record_job(
+                    "PDF->ZPL (Network)" if jalur == "network" else "PDF->ZPL",
+                    target_printer, res
+                )
+                return res
+            except ZplConversionError as e:
+                if mode == "zpl":
+                    res = PrintJobResult(
+                        success=False, printer=target_printer,
+                        error=f"Gagal mengubah PDF menjadi ZPL: {e}"
+                    )
+                    self._record_job("PDF->ZPL", target_printer, res)
+                    return res
+                logger.warning(
+                    f"[PrinterManager] Konversi ZPL gagal ({e}), kembali ke jalur driver."
+                )
+
         if not self.backend:
             res = PrintJobResult(success=False, printer=target_printer, error="Backend printer tidak aktif.")
             self._record_job("PDF", target_printer, res)
             return res
 
         res = self.backend.print_pdf(target_printer, raw_bytes, doc_name=doc_name, options=options)
+        for _ in range(qty - 1):
+            if not res.success:
+                break
+            res = self.backend.print_pdf(target_printer, raw_bytes, doc_name=doc_name, options=options)
         self._record_job("PDF", target_printer, res)
         return res
 
@@ -291,6 +386,33 @@ class PrinterManager:
             return res
 
         target_printer = self.resolve_printer(printer_name, job_type="doc")
+        options = dict(options or {})
+        mode = self._resolve_render_mode(options)
+        pakai_zpl = mode == "zpl" or (mode == "auto" and self.printer_uses_zpl(target_printer))
+
+        if pakai_zpl:
+            try:
+                zpl_bytes = image_to_zpl(raw_bytes, options)
+                res, jalur = self._send_raw(target_printer, zpl_bytes, doc_name)
+                if res.success:
+                    res.message = f"Gambar dicetak sebagai ZPL raster ({len(zpl_bytes)} byte)"
+                self._record_job(
+                    "IMAGE->ZPL (Network)" if jalur == "network" else "IMAGE->ZPL",
+                    target_printer, res
+                )
+                return res
+            except ZplConversionError as e:
+                if mode == "zpl":
+                    res = PrintJobResult(
+                        success=False, printer=target_printer,
+                        error=f"Gagal mengubah gambar menjadi ZPL: {e}"
+                    )
+                    self._record_job("IMAGE->ZPL", target_printer, res)
+                    return res
+                logger.warning(
+                    f"[PrinterManager] Konversi ZPL gagal ({e}), kembali ke jalur driver."
+                )
+
         if not self.backend:
             res = PrintJobResult(success=False, printer=target_printer, error="Backend printer tidak aktif.")
             self._record_job("IMAGE", target_printer, res)

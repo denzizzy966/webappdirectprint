@@ -19,6 +19,7 @@ Dokumentasi interaktif bawaan FastAPI: `http://127.0.0.1:18212/docs`.
 | POST | `/api/print/raw` | Cetak ESC/POS, ZPL, TSPL, teks polos |
 | POST | `/api/print/pdf` | Cetak PDF dari URL / Base64 / path berkas |
 | POST | `/api/print/image` | Cetak gambar PNG / JPG / BMP (Base64) |
+| POST | `/api/print/pdf-to-zpl` | Ubah PDF menjadi perintah ZPL raster **tanpa mencetak** |
 | POST | `/api/cashdrawer/open` | Pulsa buka laci kasir (`pin` 2 atau 5) |
 | POST | `/api/print/test-receipt` | Struk ESC/POS contoh (`?printer=`) |
 | POST | `/api/print/test-label` | Label ZPL contoh (`?printer=`) |

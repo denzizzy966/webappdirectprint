@@ -261,19 +261,38 @@ function updateSandboxBase64Preview() {
     frame.src = `data:application/pdf;base64,${b64}`;
 }
 
+/** Membaca opsi render dari panel Base64 sandbox. */
+function sandboxBase64Options() {
+    const val = (id, fallback) => {
+        const el = document.getElementById(id);
+        return el && el.value !== '' ? el.value : fallback;
+    };
+    return {
+        mode:      val('sandboxBase64Mode', 'auto'),
+        dpi:       parseInt(val('sandboxBase64Dpi', '203'), 10) || 203,
+        qty:       Math.max(1, parseInt(val('sandboxBase64Qty', '1'), 10) || 1),
+        threshold: parseInt(val('sandboxBase64Threshold', '128'), 10) || 128
+    };
+}
+
+/** Label mode cetak untuk ditampilkan di log. */
+function labelModeCetak(mode) {
+    if (mode === 'zpl') return 'ZPL Raster ^GFA';
+    if (mode === 'driver') return 'Driver Windows/CUPS';
+    return 'Auto';
+}
+
 async function testPrintBase64Pdf() {
     const printer = document.getElementById('targetPrinterSelect').value;
     const b64 = document.getElementById('sandboxBase64Input').value.trim();
-    const dpi = parseInt(document.getElementById('sandboxBase64Dpi').value, 10) || 203;
-    const orientation = document.getElementById('sandboxBase64Orientation').value || 'auto';
-    const fit = document.getElementById('sandboxBase64Fit').value || 'fit_page';
+    const opts = sandboxBase64Options();
 
     if (!b64) {
         alert('Data string Base64 PDF tidak boleh kosong!');
         return;
     }
 
-    addLog(`🖨️ Mengirim Base64 PDF (${b64.length} karakter) ke printer: ${printer} (DPI: ${dpi}, Fit: ${fit})...`);
+    addLog(`\u{1F5A8}\uFE0F Mengirim Base64 PDF (${b64.length} karakter) ke "${printer}" \u2014 mode: ${labelModeCetak(opts.mode)}, ${opts.dpi} DPI, qty ${opts.qty}...`);
     try {
         const res = await fetch('/api/print/pdf', {
             method: 'POST',
@@ -281,21 +300,64 @@ async function testPrintBase64Pdf() {
             body: JSON.stringify({
                 printer: printer,
                 pdf_data: b64,
-                dpi: dpi,
-                orientation: orientation,
-                fit: fit,
-                doc_name: 'Test_Label_Base64'
+                doc_name: 'Test_Label_Base64',
+                options: opts
             })
         });
         const json = await res.json();
-        if (json.status === 'success') {
-            addLog(`✅ Cetak Base64 PDF Berhasil! Spooled ke "${json.result.printer}" (${json.result.bytes_sent || 'OK'} bytes)`, 'success');
+        if (res.ok && json.status === 'success') {
+            addLog(`\u2705 Cetak Base64 PDF Berhasil! ${json.result.message || ''} (printer: ${json.result.printer})`, 'success');
         } else {
-            addLog(`❌ Cetak Base64 PDF Gagal: ${json.detail || json.message || JSON.stringify(json)}`, 'error');
+            addLog(`\u274C Cetak Base64 PDF Gagal: ${json.detail || json.message || JSON.stringify(json)}`, 'error');
+            if (opts.mode === 'auto') {
+                addLog('\u{1F4A1} Printer label sering gagal lewat driver. Coba pilih Mode Cetak = "ZPL Raster ^GFA".', 'warn');
+            }
         }
         loadPrintHistory();
     } catch (e) {
-        addLog(`❌ Error cetak Base64 PDF: ${e.message}`, 'error');
+        addLog(`\u274C Error cetak Base64 PDF: ${e.message}`, 'error');
+    }
+}
+
+/**
+ * Mengubah Base64 PDF menjadi perintah ZPL lalu memuatnya ke tab Custom RAW,
+ * sehingga bisa diperiksa dan dicetak lewat jalur RAW yang sudah terbukti jalan.
+ */
+async function previewBase64AsZpl() {
+    const b64 = document.getElementById('sandboxBase64Input').value.trim();
+    const opts = sandboxBase64Options();
+
+    if (!b64) {
+        alert('Data string Base64 PDF tidak boleh kosong!');
+        return;
+    }
+
+    addLog(`\u{1F50D} Mengubah Base64 PDF menjadi ZPL (${opts.dpi} DPI, ambang ${opts.threshold})...`);
+    try {
+        const res = await fetch('/api/print/pdf-to-zpl', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdf_data: b64, options: opts })
+        });
+        const json = await res.json();
+        if (!res.ok || json.status !== 'success') {
+            addLog(`\u274C Konversi ZPL gagal: ${json.detail || json.message}`, 'error');
+            return;
+        }
+
+        const target = document.getElementById('customRawInput');
+        if (target) {
+            target.value = json.zpl;
+            switchSandboxTab('raw');
+            const btn = document.getElementById('btnSubtabRaw');
+            if (btn) {
+                document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            }
+        }
+        addLog(`\u2705 ZPL siap: ${json.labels} label, ${json.zpl_bytes} byte (dari ${json.pdf_bytes} byte PDF). Dimuat ke tab Custom RAW \u2014 tekan "Cetak RAW Langsung" untuk mencetak.`, 'success');
+    } catch (e) {
+        addLog(`\u274C Error konversi ZPL: ${e.message}`, 'error');
     }
 }
 
@@ -306,33 +368,26 @@ async function testPrintBase64PdfSDK() {
     }
     const printer = document.getElementById('targetPrinterSelect').value;
     const b64 = document.getElementById('sandboxBase64Input').value.trim();
-    const dpi = parseInt(document.getElementById('sandboxBase64Dpi').value, 10) || 203;
-    const orientation = document.getElementById('sandboxBase64Orientation').value || 'auto';
-    const fit = document.getElementById('sandboxBase64Fit').value || 'fit_page';
+    const opts = sandboxBase64Options();
 
     if (!b64) {
         alert('Data string Base64 PDF tidak boleh kosong!');
         return;
     }
 
-    addLog(`⚡ Mengirim Base64 PDF via HardwareBridge JS SDK ke: ${printer}...`);
+    addLog(`\u26A1 Mengirim Base64 PDF via HardwareBridge SDK ke "${printer}" \u2014 mode: ${labelModeCetak(opts.mode)}...`);
     try {
-        const res = await bridge.printPdf({
-            printer: printer,
-            pdf_data: b64,
-            dpi: dpi,
-            orientation: orientation,
-            fit: fit,
-            doc_name: 'Test_SDK_Label'
-        });
-        if (res.success || res.status === 'success') {
-            addLog(`✅ [SDK] Cetak Base64 Berhasil! Printer: ${res.printer || printer}`, 'success');
+        // Signature SDK bersifat posisional: (printer, data, docName, options)
+        const res = await bridge.printPdf(printer, b64, 'Test_SDK_Label', opts);
+        if (res.status === 'success' || res.success) {
+            const detail = (res.result && res.result.message) || res.message || '';
+            addLog(`\u2705 [SDK] Cetak Base64 Berhasil! ${detail}`, 'success');
         } else {
-            addLog(`❌ [SDK] Cetak Base64 Gagal: ${res.error || res.message}`, 'error');
+            addLog(`\u274C [SDK] Cetak Gagal: ${res.detail || res.message || JSON.stringify(res)}`, 'error');
         }
         loadPrintHistory();
     } catch (e) {
-        addLog(`❌ [SDK] Error: ${e.message}`, 'error');
+        addLog(`\u274C [SDK] Error: ${e.message}`, 'error');
     }
 }
 
@@ -377,8 +432,13 @@ function handleSandboxFileUpload(event) {
 async function testPrintFilePdf() {
     const printer = document.getElementById('targetPrinterSelect').value;
     const url = document.getElementById('sandboxPdfUrlInput').value.trim();
-    const dpi = parseInt(document.getElementById('sandboxFileDpi').value, 10) || 203;
-    const fit = document.getElementById('sandboxFileFit').value || 'fit_page';
+    const modeEl = document.getElementById('sandboxFileMode');
+    const qtyEl = document.getElementById('sandboxFileQty');
+    const opts = {
+        mode: modeEl ? modeEl.value : 'auto',
+        dpi: parseInt(document.getElementById('sandboxFileDpi').value, 10) || 203,
+        qty: qtyEl ? Math.max(1, parseInt(qtyEl.value, 10) || 1) : 1
+    };
 
     if (!url) {
         alert('URL berkas PDF tidak boleh kosong!');
@@ -390,7 +450,7 @@ async function testPrintFilePdf() {
         fullUrl = window.location.origin + url;
     }
 
-    addLog(`🖨️ Mengirim berkas PDF (${fullUrl}) ke printer: ${printer}...`);
+    addLog(`\u{1F5A8}\uFE0F Mengirim berkas PDF (${fullUrl}) ke "${printer}" \u2014 mode: ${labelModeCetak(opts.mode)}, ${opts.dpi} DPI...`);
     try {
         const res = await fetch('/api/print/pdf', {
             method: 'POST',
@@ -398,20 +458,22 @@ async function testPrintFilePdf() {
             body: JSON.stringify({
                 printer: printer,
                 pdf_data: fullUrl,
-                dpi: dpi,
-                fit: fit,
-                doc_name: 'Test_Invoice_Doc'
+                doc_name: 'Test_Invoice_Doc',
+                options: opts
             })
         });
         const json = await res.json();
-        if (json.status === 'success') {
-            addLog(`✅ Cetak PDF Dokumen Berhasil! Spooled ke "${json.result.printer}"`, 'success');
+        if (res.ok && json.status === 'success') {
+            addLog(`\u2705 Cetak PDF Dokumen Berhasil! ${json.result.message || ''} (printer: ${json.result.printer})`, 'success');
         } else {
-            addLog(`❌ Cetak PDF Gagal: ${json.detail || json.message}`, 'error');
+            addLog(`\u274C Cetak PDF Gagal: ${json.detail || json.message}`, 'error');
+            if (opts.mode === 'auto') {
+                addLog('\u{1F4A1} Untuk printer label, coba Mode Cetak = "ZPL Raster ^GFA".', 'warn');
+            }
         }
         loadPrintHistory();
     } catch (e) {
-        addLog(`❌ Error cetak berkas PDF: ${e.message}`, 'error');
+        addLog(`\u274C Error cetak berkas PDF: ${e.message}`, 'error');
     }
 }
 

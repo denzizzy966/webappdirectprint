@@ -16,6 +16,7 @@ Dokumen ini adalah **pintu masuk** seluruh panduan cetak langsung tanpa dialog
 | [05-printer-target-pool.md](05-printer-target-pool.md) | Memilih printer: nama fisik, alias `pool`, printer jaringan TCP 9100 |
 | [06-referensi-api-print.md](06-referensi-api-print.md) | Referensi lengkap payload & respons endpoint cetak (REST + WebSocket) |
 | [07-troubleshooting-print.md](07-troubleshooting-print.md) | Daftar galat yang sering muncul beserta solusinya |
+| [08-printer-label-zpl.md](08-printer-label-zpl.md) | **Mode ZPL Raster**: solusi bila PDF/Base64 gagal dicetak di printer label |
 
 ---
 
@@ -65,3 +66,8 @@ await fetch('http://127.0.0.1:18212/api/print/pdf', {
    Jadi PC tempat bridge berjalan yang harus bisa menjangkau `192.168.3.25`,
    dan URL tersebut harus bisa dibuka **tanpa login/sesi** → lihat
    [03-pdf-dari-url.md](03-pdf-dari-url.md).
+
+4. **Printer label menolak PDF?** Kirim `options: { mode: "zpl", dpi: 203 }`.
+   PDF diubah menjadi perintah ZPL raster lalu dikirim lewat jalur RAW — jalur
+   yang sama dengan template ZPL yang sudah berhasil di tab Custom RAW →
+   [08-printer-label-zpl.md](08-printer-label-zpl.md).

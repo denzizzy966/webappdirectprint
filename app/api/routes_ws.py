@@ -34,6 +34,22 @@ class ConnectionManager:
 
 ws_manager = ConnectionManager()
 
+# Kunci opsi render yang boleh dikirim di level atas pesan WebSocket
+_RENDER_KEYS = (
+    "mode", "render", "render_mode", "dpi", "qty", "threshold", "dither",
+    "darkness", "speed", "rotate", "offset_x", "offset_y",
+    "orientation", "fit", "label_width_dots",
+)
+
+
+def _render_options(req: Dict[str, Any]) -> Dict[str, Any]:
+    """Menggabungkan `options` pesan WebSocket dengan opsi render di level atas."""
+    opts: Dict[str, Any] = dict(req.get("options") or {})
+    for key in _RENDER_KEYS:
+        if req.get(key) is not None and key not in opts:
+            opts[key] = req[key]
+    return opts
+
 @router.websocket("/ws")
 @router.websocket("/")
 @router.websocket("/printer")
@@ -62,14 +78,17 @@ async def websocket_endpoint(websocket: WebSocket):
             # ────────────────────────────────────────────────────────────
             # 0. Dukungan Format Langsung whb_print.js di ERPNext (Asset Label PDF)
             # ────────────────────────────────────────────────────────────
-            if "file_content" in req or req.get("type") in ("asset_label", "pdf"):
+            if "file_content" in req or req.get("type") in ("asset_label", "pdf", "barcode", "BARCODE"):
                 base64_data = req.get("file_content") or req.get("data")
                 qty = max(1, int(req.get("qty", 1)))
                 doc_name = req.get("url") or req.get("docName") or "Asset_Label"
                 target = req.get("printer") or req.get("target") or req.get("pool") or req.get("type") or "asset_label"
-                res = None
-                for _ in range(qty):
-                    res = printer_manager.print_pdf(target, base64_data, doc_name=doc_name)
+                # qty diteruskan lewat options: jalur ZPL memakai ^PQ, jalur
+                # driver mengulang job di dalam print_pdf. Tidak ada loop di sini
+                # agar jumlah cetakan tidak terkali dua kali.
+                opts = _render_options(req)
+                opts["qty"] = qty
+                res = printer_manager.print_pdf(target, base64_data, doc_name=doc_name, options=opts)
                 
                 resp = {
                     "status": "success" if res and res.success else "error",
@@ -104,12 +123,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = req.get("data", "")
                 doc_name = req.get("docName", "WS_PrintJob")
 
-                if print_type == "raw":
-                    res = printer_manager.print_raw(printer_name, data, doc_name=doc_name)
-                elif print_type == "pdf":
-                    res = printer_manager.print_pdf(printer_name, data, doc_name=doc_name)
+                opts = _render_options(req)
+
+                if print_type == "pdf":
+                    res = printer_manager.print_pdf(printer_name, data, doc_name=doc_name, options=opts)
                 elif print_type == "image":
-                    res = printer_manager.print_image(printer_name, data, doc_name=doc_name)
+                    res = printer_manager.print_image(printer_name, data, doc_name=doc_name, options=opts)
                 else:
                     res = printer_manager.print_raw(printer_name, data, doc_name=doc_name)
 

@@ -78,7 +78,7 @@ HardwareBridge.openCashDrawer(namaPrinter, pin);
 > HardwareBridge.printPdf({ printer: 'asset_label', pdf_data: url });
 >
 > // ✅ BENAR
-> HardwareBridge.printPdf('asset_label', url, 'Label Produksi', { dpi: 203 });
+> HardwareBridge.printPdf('asset_label', url, 'Label Produksi', { mode: 'zpl', dpi: 203 });
 > ```
 
 Nilai kembalian adalah **body JSON apa adanya** dari bridge:
@@ -188,8 +188,8 @@ bridge.onWeightChange(scales => {
 `onWeightChange` mengaktifkan langganan `subscribeScale` dan menerima pembaruan tiap
 0,3 detik.
 
-> ⚠️ Pada jalur WebSocket, `options` **tidak** diteruskan ke pencetakan PDF —
-> DPI selalu 300. Gunakan metode statis (HTTP) bila perlu mengatur DPI.
+`options` diteruskan sepenuhnya pada jalur WebSocket maupun HTTP, termasuk
+`mode: 'zpl'` untuk printer label.
 
 ---
 

@@ -57,7 +57,9 @@ insecure content** → **Add** → masukkan asal aplikasi Anda (mis.
 
 | Pesan | Penyebab | Solusi |
 |-------|----------|--------|
-| `Gagal mencetak PDF ke '...': Failed to open stream` | Isinya bukan PDF (HTML, halaman galat, gambar) | Pastikan hasil decode diawali `%PDF-` |
+| `Data yang dikirim adalah HTML, bukan PDF` | HTML di-Base64-kan langsung | Render HTML menjadi PDF dulu ([02-html-ke-base64.md](02-html-ke-base64.md)) |
+| `Data yang dikirim bukan berkas PDF (tidak diawali '%PDF-')` | Halaman galat / gambar / berkas salah | Periksa 4 byte pertama hasil decode |
+| `Gagal mencetak PDF ke '...': Failed to open stream` | Isinya bukan PDF (jalur driver) | Pastikan hasil decode diawali `%PDF-` |
 | `Gagal mencetak PDF ke '...': cannot open broken document` | Base64 terpotong / transfer tidak lengkap | Cek panjang string sebelum dikirim |
 | `Gagal membaca data PDF atau berkas: ...` | Base64 pendek yang gagal decode dan juga bukan path berkas | Tambahkan prefiks `base64:` |
 | `Invalid base64-encoded string` | Ada karakter di luar alfabet Base64 | Buang spasi/newline; jangan URL-encode Base64-nya |
@@ -90,6 +92,9 @@ console.log(bin.slice(0, 5));               // harus "%PDF-"
 | Hasil cetak buram / bergerigi | DPI terlalu rendah | Kirim `options: { dpi: 203 }` untuk thermal, `300` untuk laser |
 | Cetakan lambat, berkas spool besar | DPI terlalu tinggi (PDF dirasterisasi jadi bitmap) | Turunkan `dpi`; 203 sudah cukup untuk label thermal |
 | Perintah ZPL tercetak sebagai teks `^XA^FO...` | Printer memakai driver grafis, bukan ZPL | Pasang ulang sebagai "Godex G500 GZPL" / Generic Text |
+| **PDF/Base64 selalu gagal, tetapi ZPL Custom RAW berhasil** | Driver label tidak andal pada jalur GDI | Pakai `options: { mode: "zpl", dpi: 203 }` — lihat [08-printer-label-zpl.md](08-printer-label-zpl.md) |
+| Label mode ZPL tercetak ~1,5× terlalu besar | DPI render tidak cocok dengan printer | Set `dpi: 203` untuk printer label thermal |
+| Barcode mode ZPL tidak terbaca pemindai | Dithering atau DPI tidak cocok | Pastikan `dither: false` dan `dpi` sama dengan dpi printer |
 | Teks selalu di atas, tidak bisa turun | Bridge memakai `dest_y = 0` (rata atas, tengah horizontal) | Atur margin di dalam PDF-nya |
 | Karakter Indonesia jadi simbol aneh (RAW) | Encoding tidak cocok | Ubah `printers.default_encoding` ke `cp850` atau `utf-8` |
 | Teks pendek RAW tercetak sebagai sampah | Teks ikut ter-decode sebagai Base64 | Awali dengan `\x1B@` atau newline, lihat [04-raw-escpos-zpl.md](04-raw-escpos-zpl.md) §4.1 |

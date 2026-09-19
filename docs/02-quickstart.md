@@ -145,4 +145,5 @@ if (!res.ok || json.status !== 'success') throw new Error(json.detail);
 | Struk thermal / label barcode | [direct-print/04-raw-escpos-zpl.md](direct-print/04-raw-escpos-zpl.md) |
 | Bridge jalan otomatis saat booting | [03-instalasi.md](03-instalasi.md) |
 | Membaca timbangan digital | [06-timbangan-serial.md](06-timbangan-serial.md) |
+| PDF gagal di printer label Godex / Zebra | [direct-print/08-printer-label-zpl.md](direct-print/08-printer-label-zpl.md) |
 | Cetak gagal | [direct-print/07-troubleshooting-print.md](direct-print/07-troubleshooting-print.md) |
