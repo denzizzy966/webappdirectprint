@@ -592,12 +592,25 @@ def download_all_scripts_zip():
         pos_path = BASE_DIR / "erpnext" / "erpnext_pos_direct_print.js"
         if pos_path.exists():
             zf.write(pos_path, arcname="erpnext_pos_direct_print.js")
-        guide_path = BASE_DIR / "erpnext" / "PANDUAN_ERPNEXT.md"
-        if guide_path.exists():
-            zf.write(guide_path, arcname="PANDUAN_ERPNEXT.md")
-        arch_path = BASE_DIR / "ARCHITECTURE_EXPLANATION.md"
-        if arch_path.exists():
-            zf.write(arch_path, arcname="ARCHITECTURE_EXPLANATION.md")
+        # Dokumentasi terpusat di folder docs/ (fallback ke lokasi lama bila belum dipindah)
+        doc_files = [
+            (BASE_DIR / "docs" / "integrasi" / "erpnext.md", "docs/integrasi/erpnext.md",
+             BASE_DIR / "erpnext" / "PANDUAN_ERPNEXT.md"),
+            (BASE_DIR / "docs" / "01-arsitektur.md", "docs/01-arsitektur.md",
+             BASE_DIR / "ARCHITECTURE_EXPLANATION.md"),
+            (BASE_DIR / "docs" / "README.md", "docs/README.md", None),
+            (BASE_DIR / "docs" / "05-api-reference.md", "docs/05-api-reference.md", None),
+            (BASE_DIR / "docs" / "07-sdk-javascript.md", "docs/07-sdk-javascript.md", None),
+        ]
+        for primary, arcname, legacy in doc_files:
+            src = primary if primary.exists() else legacy
+            if src and src.exists():
+                zf.write(src, arcname=arcname)
+
+        dp_dir = BASE_DIR / "docs" / "direct-print"
+        if dp_dir.is_dir():
+            for md in sorted(dp_dir.glob("*.md")):
+                zf.write(md, arcname=f"docs/direct-print/{md.name}")
     buf.seek(0)
     return Response(
         content=buf.getvalue(),

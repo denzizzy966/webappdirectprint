@@ -42,4 +42,4 @@ Hasil build binary mandiri berada di `..\dist\HardwareBridge\HardwareBridge.exe`
 - **Pindah Port COM USB:** Hardware Bridge memiliki fitur *Auto-Resolve* berdasarkan serial number chip adapter USB (e.g. `BMCBE14A312`). Jika Anda memindahkan colokan USB dari `COM5` ke `COM1`, bridge akan otomatis mendeteksinya tanpa perlu setelan manual.
 - **Port Terkunci oleh Delphi (*Access is denied*):** Tekan tombol **`⏸️ Lepas Port (Delphi)`** di dashboard, atau aktifkan mode `"sharing_mode": "on_demand"` di `bridge_config.json`.
 
-*Untuk panduan lengkap, lihat: [../INSTALLER_README.md](../INSTALLER_README.md)*
+*Untuk panduan lengkap, lihat: [../03-instalasi.md](../03-instalasi.md)*

@@ -77,4 +77,4 @@ sudo bash uninstall.sh
   ```
   *(Perlu Log Out lalu Log In kembali).*
 
-*Untuk panduan lengkap, lihat: [../INSTALLER_README.md](../INSTALLER_README.md)*
+*Untuk panduan lengkap, lihat: [../03-instalasi.md](../03-instalasi.md)*

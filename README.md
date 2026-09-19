@@ -7,6 +7,29 @@ Aplikasi **Hardware Bridge Universal** lintas platform (**Windows 10/11** dan **
 
 ---
 
+## 📚 Dokumentasi
+
+Seluruh dokumentasi terkumpul di folder **[`docs/`](docs/)**.
+
+| Kebutuhan | Dokumen |
+|-----------|---------|
+| 🗂️ Indeks seluruh dokumentasi | **[docs/README.md](docs/README.md)** |
+| 🚀 Mencetak pertama kali dalam 5 menit | [docs/02-quickstart.md](docs/02-quickstart.md) |
+| 🖨️ **Panduan Direct Print lengkap** | **[docs/direct-print/](docs/direct-print/)** |
+| &nbsp;&nbsp;↳ HTML dikonversi ke Base64 lalu dicetak | [docs/direct-print/02-html-ke-base64.md](docs/direct-print/02-html-ke-base64.md) |
+| &nbsp;&nbsp;↳ Cetak PDF dari URL server (mis. `192.168.3.25/produksi/ProduksiPDF/`) | [docs/direct-print/03-pdf-dari-url.md](docs/direct-print/03-pdf-dari-url.md) |
+| &nbsp;&nbsp;↳ ESC/POS, ZPL, TSPL, laci kasir | [docs/direct-print/04-raw-escpos-zpl.md](docs/direct-print/04-raw-escpos-zpl.md) |
+| 🏗️ Arsitektur (kenapa di PC klien) | [docs/01-arsitektur.md](docs/01-arsitektur.md) |
+| 📦 Instalasi & deployment | [docs/03-instalasi.md](docs/03-instalasi.md) |
+| ⚙️ Referensi `bridge_config.json` | [docs/04-konfigurasi.md](docs/04-konfigurasi.md) |
+| 📡 Referensi API REST & WebSocket | [docs/05-api-reference.md](docs/05-api-reference.md) |
+| ⚖️ Timbangan digital serial | [docs/06-timbangan-serial.md](docs/06-timbangan-serial.md) |
+| 💻 SDK JavaScript | [docs/07-sdk-javascript.md](docs/07-sdk-javascript.md) |
+| 🛠️ Troubleshooting | [docs/08-troubleshooting.md](docs/08-troubleshooting.md) |
+| 🔌 Integrasi ERPNext / Laravel | [docs/integrasi/](docs/integrasi/) |
+
+---
+
 ## 🏗️ Mengapa Harus Berjalan di Client PC? (Jawaban Arsitektur)
 
 > **Apakah bisa dari sisi server ERPNext atau hanya bisa di Client PC?**
@@ -16,7 +39,7 @@ Aplikasi **Hardware Bridge Universal** lintas platform (**Windows 10/11** dan **
    Server ERPNext (di Cloud VPS, Docker, atau WSL) tidak memiliki kabel fisik ke meja kasir. Peramban kasir juga dibatasi oleh *browser sandbox* sehingga tidak bisa langsung mengakses port USB/COM lokal tanpa bridge.
 2. **Untuk Printer Jaringan (Ethernet LAN / Wi-Fi Raw Port 9100):**  
    Bisa dilakukan dari server ERPNext *jika dan hanya jika* server ERPNext berada di subnet LAN lokal yang sama dengan printer.
-3. *Baca analisis lengkap di dokumen [ARCHITECTURE_EXPLANATION.md](file:///D:/Workspaces-gemini/webappdirectprint/ARCHITECTURE_EXPLANATION.md).*
+3. *Baca analisis lengkap di dokumen [docs/01-arsitektur.md](docs/01-arsitektur.md).*
 
 ---
 
@@ -41,7 +64,7 @@ Aplikasi **Hardware Bridge Universal** lintas platform (**Windows 10/11** dan **
 
 ## 📖 Panduan Instalasi Lengkap (Installer Guide)
 > Untuk panduan langkah-demi-langkah, instalasi service background, auto-start Windows, systemd Linux, dan troubleshooting, silakan baca:  
-> 👉 **[INSTALLER_README.md](file:///D:/Workspaces-gemini/webappdirectprint/INSTALLER_README.md)**
+> 👉 **[docs/03-instalasi.md](docs/03-instalasi.md)**
 
 ---
 
@@ -99,7 +122,7 @@ Integrasi ke ERPNext sangat mudah:
 3. Salin isi script dari berkas [`erpnext/erpnext_hardware_bridge.js`](file:///D:/Workspaces-gemini/webappdirectprint/erpnext/erpnext_hardware_bridge.js).
 4. Centang **Enabled** dan klik **Save**.
 5. Tombol **"Cetak Struk (Direct Print)"** dan **"Timbang Item Aktif"** akan langsung muncul di dokumen transaksi Anda!
-6. *Lihat panduan lengkap di [erpnext/PANDUAN_ERPNEXT.md](file:///D:/Workspaces-gemini/webappdirectprint/erpnext/PANDUAN_ERPNEXT.md).*
+6. *Lihat panduan lengkap di [docs/integrasi/erpnext.md](docs/integrasi/erpnext.md).*
 
 ---
 

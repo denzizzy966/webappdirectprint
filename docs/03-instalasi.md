@@ -357,4 +357,4 @@ Setelah instalasi selesai (baik di Windows maupun Linux):
 4. **Integrasi ERPNext & Web App:**
    * Unduh SDK JS langsung dari dashboard di tab *Dokumentasi & SDK* atau lewat URL:
      `http://127.0.0.1:18212/api/download/hardware-bridge.js`
-   * Pasang script client di ERPNext sesuai petunjuk di [`erpnext/PANDUAN_ERPNEXT.md`](file:///D:/Workspaces-gemini/webappdirectprint/erpnext/PANDUAN_ERPNEXT.md).
+   * Pasang script client di ERPNext sesuai petunjuk di [`docs/integrasi/erpnext.md`](integrasi/erpnext.md).
