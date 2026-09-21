@@ -38,6 +38,7 @@ RENDER_OPTION_KEYS = (
     "mode", "render", "render_mode", "dpi", "qty", "threshold", "dither",
     "darkness", "speed", "rotate", "offset_x", "offset_y",
     "orientation", "fit", "label_width_dots",
+    "width_dots", "width_mm", "trim", "cut", "feed",
 )
 
 
@@ -66,7 +67,7 @@ class PrintPdfRequest(BaseModel):
     doc_name: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
     # Opsi render yang boleh dikirim di level atas
-    mode: Optional[str] = Field(None, description="auto (bawaan) | driver | zpl")
+    mode: Optional[str] = Field(None, description="auto (bawaan) | driver | zpl | escpos")
     render: Optional[str] = None
     render_mode: Optional[str] = None
     dpi: Optional[int] = None
@@ -81,6 +82,12 @@ class PrintPdfRequest(BaseModel):
     orientation: Optional[str] = None
     fit: Optional[str] = None
     label_width_dots: Optional[int] = None
+    # Opsi khusus jalur ESC/POS
+    width_dots: Optional[int] = None
+    width_mm: Optional[float] = None
+    trim: Optional[bool] = None
+    cut: Optional[bool] = None
+    feed: Optional[int] = None
 
     def resolve_source(self) -> str:
         """Mengambil sumber PDF dari pdf_data, file_content, atau url."""
@@ -111,6 +118,11 @@ class PrintImageRequest(BaseModel):
     offset_x: Optional[int] = None
     offset_y: Optional[int] = None
     label_width_dots: Optional[int] = None
+    width_dots: Optional[int] = None
+    width_mm: Optional[float] = None
+    trim: Optional[bool] = None
+    cut: Optional[bool] = None
+    feed: Optional[int] = None
 
 class CashDrawerRequest(BaseModel):
     printer: Optional[str] = None
@@ -227,6 +239,11 @@ def print_pdf_job(req: PrintPdfRequest):
       - `auto`   : jalur driver, kecuali printer terdeteksi memakai ZPL (bawaan)
       - `driver` : paksa jalur driver grafis (Windows GDI / CUPS)
       - `zpl`    : paksa konversi PDF menjadi ZPL raster ^GFA lalu kirim RAW
+      - `escpos` : paksa konversi PDF menjadi raster ESC/POS GS v 0 lalu kirim
+                   RAW. Dipakai printer struk thermal pada /dev/usb/lp* atau
+                   antrean RAW yang tidak punya filter peraster PDF.
+                   Opsi tambahan: width_dots / width_mm, threshold, dither,
+                   trim, cut, feed.
     """
     sumber = req.resolve_source()
     if not sumber:

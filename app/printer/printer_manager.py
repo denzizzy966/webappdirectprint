@@ -10,6 +10,12 @@ import requests
 from .base import PrinterBackend, PrinterInfo, PrintJobResult
 from .escpos_builder import EscPosBuilder
 from .network_socket import print_network_raw
+from .pdf_to_escpos import (
+    EscPosConversionError,
+    image_to_escpos,
+    lebar_dot as lebar_dot_escpos,
+    pdf_to_escpos,
+)
 from .pdf_to_zpl import ZplConversionError, image_to_zpl, is_zpl_printer, pdf_to_zpl
 from ..config import config_manager
 
@@ -169,10 +175,12 @@ class PrinterManager:
 
     @staticmethod
     def _resolve_render_mode(options: Optional[Dict[str, Any]]) -> str:
-        """Membaca mode render dari options: auto (bawaan), driver, atau zpl."""
+        """Membaca mode render dari options: auto (bawaan), driver, zpl, atau escpos."""
         opts = options or {}
         mode = opts.get("mode") or opts.get("render") or opts.get("render_mode") or "auto"
         mode = str(mode).strip().lower()
+        if mode in ("escpos", "esc/pos", "esc-pos", "thermal", "gsv0"):
+            return "escpos"
         if mode in ("zpl", "zpl_raster", "raster", "gfa"):
             return "zpl"
         if mode in ("driver", "gdi", "spooler", "native"):
@@ -324,6 +332,33 @@ class PrinterManager:
         mode = self._resolve_render_mode(options)
         qty = max(1, int(options.get("qty", 1) or 1))
 
+        # ── Jalur ESC/POS raster: PDF diubah menjadi GS v 0 lalu dikirim RAW ──
+        # Dipakai oleh printer struk thermal yang dipasang sebagai perangkat
+        # langsung (/dev/usb/lp*) atau antrean RAW, sehingga tidak ada filter
+        # CUPS / driver Windows yang bisa meraster PDF untuknya.
+        if mode == "escpos":
+            try:
+                escpos_bytes = pdf_to_escpos(raw_bytes, options)
+            except EscPosConversionError as e:
+                res = PrintJobResult(
+                    success=False, printer=target_printer,
+                    error=f"Gagal mengubah PDF menjadi ESC/POS: {e}"
+                )
+                self._record_job("PDF->ESCPOS", target_printer, res)
+                return res
+
+            res, jalur = self._send_raw(target_printer, escpos_bytes, doc_name)
+            if res.success:
+                res.message = (
+                    f"PDF dicetak sebagai raster ESC/POS ({len(escpos_bytes)} byte, "
+                    f"lebar {lebar_dot_escpos(options)} dot)"
+                )
+            self._record_job(
+                "PDF->ESCPOS (Network)" if jalur == "network" else "PDF->ESCPOS",
+                target_printer, res
+            )
+            return res
+
         # ── Jalur ZPL raster: PDF diubah menjadi ^GFA lalu dikirim sebagai RAW ──
         # Dipakai oleh printer label (Godex GZPL, Zebra) yang gagal atau tidak
         # akurat bila dicetak lewat driver grafis Windows.
@@ -389,6 +424,26 @@ class PrinterManager:
         options = dict(options or {})
         mode = self._resolve_render_mode(options)
         pakai_zpl = mode == "zpl" or (mode == "auto" and self.printer_uses_zpl(target_printer))
+
+        if mode == "escpos":
+            try:
+                escpos_bytes = image_to_escpos(raw_bytes, options)
+            except EscPosConversionError as e:
+                res = PrintJobResult(
+                    success=False, printer=target_printer,
+                    error=f"Gagal mengubah gambar menjadi ESC/POS: {e}"
+                )
+                self._record_job("IMAGE->ESCPOS", target_printer, res)
+                return res
+
+            res, jalur = self._send_raw(target_printer, escpos_bytes, doc_name)
+            if res.success:
+                res.message = f"Gambar dicetak sebagai raster ESC/POS ({len(escpos_bytes)} byte)"
+            self._record_job(
+                "IMAGE->ESCPOS (Network)" if jalur == "network" else "IMAGE->ESCPOS",
+                target_printer, res
+            )
+            return res
 
         if pakai_zpl:
             try:

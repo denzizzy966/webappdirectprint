@@ -30,7 +30,7 @@ kosong, bridge mengembalikan HTTP 422.
 
 | Kunci | Tipe | Bawaan | Status |
 |-------|------|--------|--------|
-| `mode` | string | `auto` | `auto` / `driver` / `zpl` — lihat §6.1.1 |
+| `mode` | string | `auto` | `auto` / `driver` / `zpl` / `escpos` — lihat §6.1.1 |
 | `dpi` | int | `203` pada mode ZPL, `300` pada mode driver | ✅ Dipakai di Windows & mode ZPL. Diabaikan di Linux/CUPS |
 | `qty` | int | `1` | ✅ Jumlah rangkap |
 | `threshold` | int | `128` | ✅ Ambang hitam-putih, hanya mode ZPL |
@@ -41,6 +41,11 @@ kosong, bridge mengembalikan HTTP 422.
 | `offset_x`, `offset_y` | int | `0` | ✅ `^FO`, hanya mode ZPL |
 | `orientation` | string | — | ⚠️ Diterima tetapi belum diimplementasikan |
 | `fit` | string | — | ⚠️ Diterima tetapi belum diimplementasikan |
+| `width_dots` | int | `576` | ✅ Lebar cetak dalam dot, hanya mode ESC/POS. Dibulatkan turun ke kelipatan 8 |
+| `width_mm` | int | `80` | ✅ Alternatif `width_dots` dalam milimeter (58/72/80), hanya mode ESC/POS |
+| `trim` | bool | `true` | ✅ Buang baris kosong di bawah isi, hanya mode ESC/POS |
+| `cut` | bool | `true` | ✅ Potong kertas di akhir, hanya mode ESC/POS |
+| `feed` | int | `3` | ✅ Baris feed sebelum potong, hanya mode ESC/POS |
 
 > ℹ️ Seluruh kunci di atas **juga boleh dikirim di level atas JSON**, demi
 > kompatibilitas dengan klien lama. Nilai di dalam `options` menang bila kunci
@@ -52,9 +57,25 @@ kosong, bridge mengembalikan HTTP 422.
 |-------|----------|
 | `auto` | **Bawaan.** Memakai ZPL raster bila nama/driver printer mengandung `zpl`, `gzpl`, `ezpl`, `zdesigner`, `zebra`, `godex`, `zt###`, `gk###`, `gx###`. Selain itu memakai driver. Bila konversi ZPL gagal, otomatis kembali ke driver |
 | `zpl` | Selalu mengubah PDF menjadi ZPL `^GFA` lalu kirim lewat jalur RAW. Kegagalan dikembalikan sebagai galat |
+| `escpos` | Selalu mengubah PDF menjadi raster ESC/POS `GS v 0` lalu kirim lewat jalur RAW. Kegagalan dikembalikan sebagai galat |
 | `driver` | Selalu memakai driver grafis (Windows GDI / CUPS) |
 
-Panduan lengkap: [08-printer-label-zpl.md](08-printer-label-zpl.md).
+`auto` **tidak pernah** memilih `escpos` sendiri — printer ESC/POS tidak bisa
+dikenali dari namanya seandal printer ZPL, dan salah tebak berarti berlembar-lembar
+kertas sampah. Mode ini harus diminta secara eksplisit.
+
+Mode `escpos` diperlukan bila printer struk dipasang sebagai perangkat langsung
+(`/dev/usb/lp0`, `/dev/usb/lp1`) atau antrean RAW: di situ tidak ada filter CUPS
+maupun driver Windows yang bisa meraster PDF, sehingga mode `driver` akan gagal.
+Berbeda dengan mode ZPL, skala halaman dihitung dari `width_dots` (bukan `dpi`)
+agar hasilnya selalu tepat selebar kertas.
+
+```bash
+curl -X POST http://127.0.0.1:18212/api/print/pdf   -H "Content-Type: application/json"   -d '{"printer":"tmt","pdf_data":"JVBERi0xLjQK...","doc_name":"Struk_POS",
+       "options":{"mode":"escpos","width_mm":80,"threshold":128,"qty":1}}'
+```
+
+Panduan lengkap ZPL: [08-printer-label-zpl.md](08-printer-label-zpl.md).
 
 ### Contoh
 
