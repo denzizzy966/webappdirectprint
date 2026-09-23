@@ -206,6 +206,53 @@ function ambilTimbangan() {
 
 Panduan multi-timbangan lengkap: [../06-timbangan-serial.md](../06-timbangan-serial.md).
 
+### Operator tidak perlu membuka dashboard bridge
+
+Dulu dropdown bisa tampil kosong dan `timbangKeInput()` gagal sampai ada orang
+membuka `http://127.0.0.1:18212` lalu menekan **Sambungkan**. Penyebabnya
+`enable_scale_at_startup: false` membuat bridge tidak membuka port COM, sehingga
+semua timbangan berstatus `connected: false`.
+
+Sekarang `populateScaleSelect()` dan `timbangKeInput()` memanggil
+[`ensureScaleReady()`](../07-sdk-javascript.md#ensurescalereadyopts--tanpa-buka-dashboard)
+sendiri saat mendapati belum ada timbangan yang tersambung. **Kode di atas tidak
+perlu diubah** — cukup pastikan `hardware-bridge.js` yang dipakai sudah versi
+terbaru (unduh ulang dari `http://127.0.0.1:18212/api/download/hardware-bridge.js`).
+
+Penantian itu hanya terjadi sekali per PC, karena setelannya ikut tersimpan ke
+`bridge_config.json`.
+
+### Pola satu timbangan tetap vs pilihan operator
+
+```js
+// Tipe 1 — satu timbangan tetap
+await HardwareBridge.timbangKeInput('#berat', {
+    scale:          'Timbangan Utama',   // rujuk NAMA, bukan 'COM1'
+    stable_timeout: 6,
+    decimals:       2,
+    alerts:         true
+});
+
+// Tipe 2 — operator memilih lewat dropdown
+await HardwareBridge.timbangKeInput('#berat', {
+    scale:          document.querySelector('#pilihTimbangan').value,
+    stable_timeout: 6,
+    decimals:       2,
+    alerts:         true
+});
+```
+
+> **Rujuk nama timbangan, bukan nomor port.** `scale: 'COM1'` memang valid —
+> `pickScale()` mencocokkan port secara persis — tetapi akan pecah begitu
+> aplikasi dipasang di Linux (`/dev/ttyUSB0`) atau saat kabel dipindah ke lubang
+> USB lain. Beri `"name"` yang tetap di `bridge_config.json`, lalu biarkan tiap
+> PC memetakan nama itu ke portnya sendiri — persis pola alias `pools` untuk
+> printer. Untuk memastikan port terlacak otomatis walau pindah slot USB, isi
+> juga `"usb_serial"` dengan serial number adapternya.
+>
+> Kalau di PC itu hanya ada satu timbangan fisik, `scale: null` sudah cukup:
+> SDK otomatis memilih timbangan fisik pertama yang online.
+
 ---
 
 ## 6. Vue / Inertia

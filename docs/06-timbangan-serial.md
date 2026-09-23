@@ -98,6 +98,65 @@ Buka file konfigurasi `bridge_config.json`. Anda dapat mendaftarkan satu, dua, a
 
 ---
 
+### ⚠️ `enable_scale_at_startup` — penyebab "harus buka dashboard dulu"
+
+Ini setelan paling sering bikin bingung, jadi perlu dipahami betul.
+
+| Nilai | Yang terjadi |
+|---|---|
+| `false` (bawaan) | Bridge **sengaja tidak membuka port COM** saat startup. Port tetap bebas untuk aplikasi Delphi / Web Serial API browser. Konsekuensinya **semua timbangan berstatus `connected: false`** |
+| `true` | Timbangan ber-`autoconnect: true` langsung tersambung begitu bridge menyala, dan watchdog menjaganya tetap tersambung termasuk saat kabel USB dicabut-colok |
+
+Saat `false`, tiga jalur koneksi otomatis dimatikan sekaligus:
+
+- `_init_scales()` tidak memanggil `connect()` saat bridge start
+- blok auto-connect pada hotplug watchdog dilewati
+- `rescan_and_reconnect()` langsung `return`
+
+Akibatnya di aplikasi web Anda:
+
+- `populateScaleSelect()` menghasilkan dropdown **kosong** — ia hanya menampilkan
+  timbangan yang `connected`
+- `pickScale()` melempar galat **"Timbangan tidak terhubung"**
+
+…sampai ada orang membuka `http://127.0.0.1:18212` dan menekan tombol
+**Sambungkan** atau toggle startup. **Inilah kenapa terasa "harus buka dashboard
+dulu baru timbangan bisa dibaca".**
+
+#### Tiga cara mengatasinya
+
+**Cara 1 — biarkan SDK yang mengurus (tidak perlu ubah apa pun).**
+Sejak versi ini, `pickScale()`, `timbangKeInput()`, `populateScaleSelect()`,
+`liveWeight()`, dan `timbangDialog()` otomatis memanggil
+[`ensureScaleReady()`](07-sdk-javascript.md#ensurescalereadyopts--tanpa-buka-dashboard)
+begitu mendapati belum ada timbangan fisik yang tersambung. Setelan tersimpan
+permanen, jadi penantiannya hanya sekali per PC. Kode Anda tidak perlu diubah.
+
+**Cara 2 — setel langsung di `bridge_config.json`.** Paling pasti untuk PC
+produksi yang memang hanya dipakai lewat bridge:
+
+```json
+"enable_scale_at_startup": true
+```
+
+**Cara 3 — kalau port COM dipakai bersama aplikasi lain** (mis. program kasir
+Delphi lawas), jangan pilih salah satu; pakai kombinasi ini:
+
+```json
+"enable_scale_at_startup": true,
+"sharing_mode": "on_demand",
+"idle_release_seconds": 4.0
+```
+
+Bridge tetap tersambung otomatis, tapi melepas port setelah 4 detik idle dan
+membukanya lagi saat ada panggilan API. Dua aplikasi kebagian port yang sama.
+
+> `on_demand` **wajib** dipasangkan dengan `enable_scale_at_startup: true`.
+> Bila `false`, mekanisme buka-ulang port ikut mati sehingga port tidak pernah
+> dibuka sama sekali.
+
+---
+
 ## 3. Menentukan Timbangan Apabila Ada 2 (atau Lebih) Timbangan Aktif
 
 Jika di meja kasir / gudang terhubung **2 timbangan aktif sekaligus** (misalnya `Timbangan Gram` pada `COM5` dan `Timbangan Koli` pada `COM3`), terdapat **4 cara praktis** untuk menentukannya di aplikasi web:

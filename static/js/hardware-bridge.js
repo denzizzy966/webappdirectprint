@@ -431,17 +431,105 @@
     };
 
     /**
-     * 4. pickScale(preferred)
+     * 3b. ensureScaleReady(opts)
+     * Memastikan minimal satu timbangan FISIK terhubung, TANPA operator perlu
+     * membuka dashboard bridge di http://127.0.0.1:18212 lebih dulu.
+     *
+     * Latar belakang: bila `enable_scale_at_startup` bernilai false, bridge
+     * sengaja TIDAK membuka port COM saat startup (agar port bebas dipakai
+     * aplikasi Delphi / Web Serial API). Akibatnya seluruh timbangan berstatus
+     * connected: false, sehingga dropdown kosong dan pickScale gagal.
+     *
+     * Fungsi ini menyalakan opsi tersebut lewat /api/scale/startup-config.
+     * Setelan itu ikut tersimpan ke bridge_config.json, jadi penantian ini
+     * hanya terjadi SEKALI per PC — mulai restart berikutnya timbangan sudah
+     * tersambung sendiri sejak bridge dinyalakan.
+     *
+     * Opsi:
+     *   - timeout: batas tunggu port terbuka, dalam detik (default: 8)
+     *   - allowSim: anggap siap walau yang aktif hanya Simulator (default: false)
+     *   - autoEnable: izinkan menyalakan enable_scale_at_startup (default: true)
+     *   - force: ulangi percobaan walau sudah pernah gagal di halaman ini (default: false)
+     */
+    let _ensureScalePromise = null;   // mencegah beberapa pemanggilan paralel menembak endpoint bersamaan
+    let _ensureScaleTried = false;    // mencegah penantian berulang di PC yang memang tanpa timbangan fisik
+
+    HardwareBridge.ensureScaleReady = async function (opts = {}) {
+        const timeoutMs = (opts.timeout == null ? 8 : opts.timeout) * 1000;
+        const allowSim = opts.allowSim === true;
+        const isReady = (list) => Array.isArray(list) && list.some(
+            s => s.connected && (allowSim || s.port !== 'SIM')
+        );
+
+        let scales = await HardwareBridge.listScales();
+        if (isReady(scales)) return scales;
+        if (opts.autoEnable === false) return scales;
+
+        // Sudah pernah dicoba dan tetap nihil: jangan bikin operator menunggu lagi
+        // tiap kali menekan tombol. Watchdog bridge tetap menyambungkan sendiri
+        // begitu kabel timbangan dicolokkan.
+        if (_ensureScaleTried && !opts.force) return scales;
+
+        if (_ensureScalePromise) return await _ensureScalePromise;
+
+        _ensureScalePromise = (async () => {
+            _ensureScaleTried = true;
+            try {
+                await apiRequest('/api/scale/startup-config', { enable_scale_at_startup: true });
+            } catch (e) {
+                // Bridge versi lama tanpa endpoint ini — lanjutkan, siapa tahu
+                // timbangan tetap tersambung lewat jalur lain.
+            }
+
+            const batas = Date.now() + timeoutMs;
+            while (Date.now() < batas) {
+                await new Promise(r => setTimeout(r, 500));
+                try {
+                    const list = await HardwareBridge.listScales();
+                    scales = list;
+                    if (isReady(list)) return list;
+                } catch (e) {
+                    // Bridge sedang sibuk membuka port serial, coba lagi siklus berikutnya.
+                }
+            }
+            return scales;
+        })();
+
+        try {
+            return await _ensureScalePromise;
+        } finally {
+            _ensureScalePromise = null;
+        }
+    };
+
+    // Alias bahasa Indonesia
+    HardwareBridge.pastikanTimbanganSiap = HardwareBridge.ensureScaleReady;
+
+    /**
+     * 4. pickScale(preferred, opts)
      * Logika cerdas untuk memilih timbangan saat ada 1, 2, atau lebih timbangan terhubung:
      * - Jika `preferred` diisi: mencocokkan Nama (exact / case-insensitive), Port (COM3/COM5), atau substring.
      * - Jika `preferred` kosong: otomatis memilih timbangan FISIK pertama yang online (bukan SIM).
+     *
+     * Bila belum ada timbangan yang terhubung, ensureScaleReady() dipanggil
+     * otomatis lebih dulu. Matikan lewat opts.autoEnsure = false.
      */
-    HardwareBridge.pickScale = async function (preferred) {
+    HardwareBridge.pickScale = async function (preferred, opts = {}) {
         let scales;
         try {
             scales = await HardwareBridge.listScales();
         } catch (e) {
             throw new Error('Hardware Bridge tidak jalan di PC ini. Pastikan aplikasi/service Hardware Bridge aktif (port 18212).');
+        }
+
+        // Belum ada timbangan fisik yang hidup? Bangunkan dulu, tanpa perlu
+        // operator membuka dashboard bridge.
+        if (opts.autoEnsure !== false && !scales.some(s => s.connected && s.port !== 'SIM')) {
+            try {
+                scales = await HardwareBridge.ensureScaleReady({ timeout: opts.ensure_timeout });
+            } catch (e) {
+                // Biarkan pesan galat di bawah yang menjelaskan ke pengguna.
+            }
         }
 
         const connected = scales.filter(s => s.connected && s.port !== 'SIM');
@@ -475,7 +563,19 @@
         const el = resolveEl(targetSelect);
         if (!el) return [];
         try {
-            const scales = await HardwareBridge.listScales();
+            let scales = await HardwareBridge.listScales();
+
+            // Dropdown hanya menampilkan timbangan yang connected. Bila belum ada
+            // yang hidup, bangunkan dulu supaya operator tidak perlu membuka
+            // dashboard bridge hanya untuk menyambungkan port.
+            if (opts.autoEnsure !== false && !scales.some(s => s.connected && s.port !== 'SIM')) {
+                try {
+                    scales = await HardwareBridge.ensureScaleReady({ timeout: opts.ensure_timeout });
+                } catch (e) {
+                    // Tetap render daftar apa adanya di bawah.
+                }
+            }
+
             const connected = scales.filter(s => s.connected);
             el.innerHTML = '';
 
@@ -500,7 +600,10 @@
                 el.appendChild(opt);
             });
 
-            if (typeof opts.onChange === 'function') {
+            // Dipasang sekali saja — populateScaleSelect kini bisa dipanggil ulang
+            // (mis. setelah ensureScaleReady), jangan sampai listener menumpuk.
+            if (typeof opts.onChange === 'function' && !el.dataset.hbOnChangeBound) {
+                el.dataset.hbOnChangeBound = '1';
                 el.addEventListener('change', () => opts.onChange(el.value));
             }
             return connected;
@@ -530,7 +633,7 @@
             return null;
         }
         try {
-            const s = await HardwareBridge.pickScale(opts.scale);
+            const s = await HardwareBridge.pickScale(opts.scale, opts);
             if (opts.alerts) toast(`Menunggu nilai STABIL dari ${s.name} [${s.port || ''}]...`);
             const r = await HardwareBridge.stableRead(s.name, opts.stable_timeout);
             if (!r.ok) throw new Error(r.error || r.message || 'Pembacaan stabil gagal');
@@ -568,7 +671,7 @@
             if (stopped) return;
             try {
                 if (!scaleName) {
-                    const picked = await HardwareBridge.pickScale(opts.scale);
+                    const picked = await HardwareBridge.pickScale(opts.scale, opts);
                     scaleName = picked.name;
                 }
                 const r = await HardwareBridge.getWeight(scaleName);
@@ -646,7 +749,12 @@
 
         let availableScales = [];
         try {
-            const all = await HardwareBridge.listScales();
+            let all = await HardwareBridge.listScales();
+            // Sambungkan dulu bila belum ada yang hidup, supaya dialog tidak
+            // tampil kosong hanya karena port COM belum dibuka bridge.
+            if (opts.autoEnsure !== false && !all.some(s => s.connected && s.port !== 'SIM')) {
+                try { all = await HardwareBridge.ensureScaleReady({ timeout: opts.ensure_timeout }); } catch (e) {}
+            }
             availableScales = all.filter(s => s.connected);
         } catch (e) {}
 

@@ -103,7 +103,8 @@ Panduan lengkap cetak: [direct-print/](direct-print/).
 | `listScales()` | Array seluruh timbangan beserta statusnya |
 | `getWeight(scale)` | Berat saat ini, instan |
 | `stableRead(scale, timeoutS)` | Menunggu sampai berat stabil |
-| `pickScale(preferred)` | Memilih timbangan: cocokkan nama/port/substring, atau ambil timbangan fisik pertama yang online |
+| `pickScale(preferred, opts)` | Memilih timbangan: cocokkan nama/port/substring, atau ambil timbangan fisik pertama yang online |
+| **`ensureScaleReady(opts)`** | **Menyambungkan timbangan tanpa operator perlu membuka dashboard bridge** |
 | `toGram(value, unit, legacy)` | Konversi satuan ke gram |
 
 ```js
@@ -113,13 +114,69 @@ const r      = await HardwareBridge.stableRead(s.name, 15);
 if (r.ok) console.log(r.weight, r.unit);
 ```
 
+### `ensureScaleReady(opts)` — tanpa buka dashboard
+
+Bila `enable_scale_at_startup` bernilai `false`, bridge sengaja **tidak membuka
+port COM** saat startup supaya port tetap bebas untuk aplikasi Delphi atau Web
+Serial API. Efek sampingnya: semua timbangan berstatus `connected: false`,
+sehingga dropdown kosong dan `pickScale()` melempar *"Timbangan tidak terhubung"*
+sampai ada orang membuka `http://127.0.0.1:18212` dan menekan **Sambungkan**.
+
+`ensureScaleReady()` menghapus langkah manual itu. Fungsi ini menyalakan opsi
+tersebut lewat `POST /api/scale/startup-config`, lalu menunggu watchdog membuka
+port. Setelan ikut tersimpan ke `bridge_config.json`, jadi **penantian ini hanya
+terjadi sekali per PC** — mulai restart berikutnya timbangan sudah tersambung
+sendiri sejak bridge dinyalakan.
+
+| Opsi | Bawaan | Keterangan |
+|------|--------|------------|
+| `timeout` | `8` | Batas tunggu port terbuka, dalam detik |
+| `allowSim` | `false` | Anggap siap walau yang aktif hanya Simulator |
+| `autoEnable` | `true` | Izinkan menyalakan `enable_scale_at_startup` |
+| `force` | `false` | Ulangi walau percobaan sebelumnya di halaman ini gagal |
+
+```js
+// Cukup panggil sekali saat halaman dimuat
+await HardwareBridge.ensureScaleReady();
+
+// Alias bahasa Indonesia, fungsinya sama persis
+await HardwareBridge.pastikanTimbanganSiap();
+```
+
+**Anda biasanya tidak perlu memanggilnya sendiri.** `pickScale()`,
+`timbangKeInput()`, `populateScaleSelect()`, `liveWeight()`, dan
+`timbangDialog()` sudah memanggilnya otomatis ketika mendapati belum ada
+timbangan fisik yang terhubung. Matikan perilaku ini dengan `autoEnsure: false`:
+
+```js
+await HardwareBridge.timbangKeInput('#berat', {
+    scale:      'Shinko 1',
+    autoEnsure: false      // jangan sentuh setelan bridge, biarkan gagal apa adanya
+});
+```
+
+Catatan perilaku:
+
+- Kalau timbangan sudah terhubung, biayanya hanya **satu GET ringan** — tidak ada
+  penantian sama sekali.
+- Beberapa pemanggilan paralel digabung menjadi **satu** permintaan ke bridge.
+- Kalau setelah dicoba tetap tidak ada timbangan fisik (mis. PC itu memang tanpa
+  timbangan), percobaan tidak diulang terus-menerus sehingga operator tidak
+  menunggu berulang kali tiap menekan tombol.
+
+> ⚠️ **Kapan sebaiknya `autoEnsure: false`?** Bila di PC itu ada aplikasi lain
+> (mis. program kasir Delphi) yang memakai port COM yang sama. Membuka port dari
+> bridge akan membuat aplikasi tersebut kena `Access is denied`. Untuk kasus itu
+> gunakan `"sharing_mode": "on_demand"` di `bridge_config.json` — lihat
+> [06-timbangan-serial.md](06-timbangan-serial.md).
+
 ### Pembantu Antarmuka
 
 | Metode | Keterangan |
 |--------|------------|
 | `timbangKeInput(target, opts)` | Baca berat stabil lalu isi ke elemen input |
 | `liveWeight(target, opts)` | Tampilkan berat live; mengembalikan fungsi untuk menghentikan |
-| `populateScaleSelect(select, opts)` | Isi `<select>` dengan timbangan yang terhubung |
+| `populateScaleSelect(select, opts)` | Isi `<select>` dengan timbangan yang terhubung (auto-sambung bila kosong) |
 | `attachIndicator(target)` | Indikator status koneksi timbangan |
 | `timbangDialog(onUse, opts)` | Dialog modal penimbangan interaktif |
 | `toast(pesan, warna)` | Notifikasi pojok kanan bawah |
