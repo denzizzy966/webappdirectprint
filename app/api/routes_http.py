@@ -347,16 +347,18 @@ def get_print_history():
 
 @router.get("/scales")
 def get_scales(format: Optional[str] = Query(None)):
-    """Mengambil daftar seluruh timbangan terdaftar beserta status saat ini."""
+    """Mengambil daftar seluruh timbangan terdaftar beserta status saat ini.
+    Secara default mengembalikan array JSON langsung [...] agar 100% kompatibel
+    dengan ERPNext (frappe.timbangan_svc). Gunakan format=object jika butuh wrapper."""
     server_cfg = config_manager.get_server_config()
     scale_list = scale_manager.get_all_status()
-    if format in ("list", "array"):
-        return scale_list
-    return {
-        "status": "success",
-        "enable_scale_at_startup": server_cfg.get("enable_scale_at_startup", False),
-        "scales": scale_list
-    }
+    if format in ("object", "wrap", "dict"):
+        return {
+            "status": "success",
+            "enable_scale_at_startup": server_cfg.get("enable_scale_at_startup", False),
+            "scales": scale_list
+        }
+    return scale_list
 
 @router.get("/scale-list")
 def get_scale_list():
@@ -375,17 +377,39 @@ def update_scale_startup_config(req: ScaleStartupConfigRequest):
 
 @router.get("/weight")
 def get_weight(scale: Optional[str] = Query(None), port: Optional[str] = Query(None)):
-    """Mengambil berat saat ini dari timbangan (cepat & non-blocking)."""
+    """Mengambil berat saat ini dari timbangan (cepat & non-blocking).
+    Kompatibel 100% dengan ERPNext frappe.timbangan_svc."""
     target = scale or port
     instance = scale_manager.get_scale(target)
     if not instance:
-        raise HTTPException(status_code=404, detail=f"Timbangan '{target}' tidak ditemukan")
+        return JSONResponse(
+            status_code=404,
+            content={"ok": False, "status": "error", "error": f"Timbangan '{target}' tidak ada di config / tidak ditemukan"}
+        )
     data = instance.get_data()
+    connected = bool(instance.connected)
+    if not connected:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "ok": False,
+                "status": "error",
+                "error": instance.status_detail or "Belum terhubung",
+                "name": instance.name,
+                "port": instance.port,
+                "weight": None,
+                "raw_weight": 0.0,
+                "unit": instance.unit,
+                "stable": False,
+                "age": data.get("age", 999.0),
+                "data": data
+            }
+        )
     return {
         "status": "success",
-        "ok": data.get("ok", data.get("connected", False)),
-        "name": data.get("name"),
-        "port": data.get("port"),
+        "ok": True,
+        "name": instance.name,
+        "port": instance.port,
         "weight": data.get("weight"),
         "raw_weight": data.get("raw_weight"),
         "unit": data.get("unit"),
@@ -404,13 +428,22 @@ async def get_stable_read(
     timeout: Optional[float] = Query(None),
     body: Optional[StableReadRequest] = None
 ):
-    """Menunggu hingga timbangan menghasilkan data yang STABIL (maksimal timeout detik)."""
+    """Menunggu hingga timbangan menghasilkan data yang STABIL (maksimal timeout detik).
+    Kompatibel 100% dengan frappe.timbangan_svc.stable_read di ERPNext."""
     target_scale = scale or port or (body.scale if body else None)
     target_timeout = timeout if timeout is not None else (body.timeout if body and body.timeout is not None else 10.0)
 
     instance = scale_manager.get_scale(target_scale)
     if not instance:
-        raise HTTPException(status_code=404, detail=f"Timbangan '{target_scale}' tidak ditemukan")
+        return JSONResponse(
+            status_code=404,
+            content={"ok": False, "status": "error", "error": f"Timbangan '{target_scale}' tidak ada di config / tidak ditemukan"}
+        )
+    if not instance.connected:
+        return JSONResponse(
+            status_code=409,
+            content={"ok": False, "status": "error", "error": instance.status_detail or "Belum terhubung"}
+        )
 
     instance.mark_api_activity()
     start_t = time.time()
@@ -435,20 +468,23 @@ async def get_stable_read(
     # Timeout reached
     d = instance.get_data()
     elapsed = round(time.time() - start_t, 2)
-    return {
-        "status": "timeout",
-        "ok": False,
-        "name": d.get("name"),
-        "port": d.get("port"),
-        "weight": d.get("weight"),
-        "unit": d.get("unit"),
-        "stable": False,
-        "elapsed": elapsed,
-        "elapsed_seconds": elapsed,
-        "error": f"Timbangan '{instance.name}' belum stabil dalam {target_timeout} detik.",
-        "message": f"Timbangan '{instance.name}' belum stabil dalam {target_timeout} detik.",
-        "data": d
-    }
+    return JSONResponse(
+        status_code=200,
+        content={
+            "status": "timeout",
+            "ok": False,
+            "name": d.get("name"),
+            "port": d.get("port"),
+            "weight": d.get("weight"),
+            "unit": d.get("unit"),
+            "stable": False,
+            "elapsed": elapsed,
+            "elapsed_seconds": elapsed,
+            "error": f"Timeout menunggu nilai stabil dari '{instance.name}'",
+            "message": f"Timeout menunggu nilai stabil dari '{instance.name}'",
+            "data": d
+        }
+    )
 
 @router.post("/scale/zero")
 def scale_zero(scale: Optional[str] = Query(None), port: Optional[str] = Query(None)):

@@ -2,7 +2,7 @@
   "server": {
     "host": "0.0.0.0",
     "port": 18212,
-    "scale_port": null,
+    "scale_port": 17800,
     "cors_origins": [
       "*"
     ],
@@ -10,46 +10,67 @@
     "sharing_mode": "continuous",
     "idle_release_seconds": 4.0,
     "pause_auto_resume_seconds": 600,
-    "enable_scale_at_startup": false
+    "enable_scale_at_startup": true
   },
   "printers": {
-    "default_raw_printer": "",
-    "default_doc_printer": "",
+    "default_raw_printer": "Godex G500 GZPL",
+    "default_doc_printer": "Godex G500 GZPL",
     "default_encoding": "cp437",
     "pools": {
-      "receipt": "",
-      "label": "",
-      "asset_label": "",
-      "barcode": "",
-      "invoice": "",
-      "kitchen": "",
-      "packing_slip": ""
+      "asset_label": "Godex G500 GZPL",
+      "label": "Godex G500 GZPL",
+      "barcode": "Godex G500 GZPL",
+      "receipt": "Godex G500 GZPL",
+      "invoice": "Microsoft Print to PDF",
+      "kitchen": "Network POS Printer (Contoh)",
+      "packing_slip": "Godex G500 GZPL"
     },
-    "network_printers": []
+    "network_printers": [
+      {
+        "name": "Network POS Printer (Contoh)",
+        "ip": "192.168.1.200",
+        "port": 9100,
+        "type": "escpos"
+      }
+    ]
   },
   "scales": [
     {
-      "name": "Timbangan Kasir 1",
-      "port": "COM1",
-      "usb_serial": "",
-      "protocol": "auto",
+      "name": "Mettler JE5002GE",
+      "usb_serial": "5",
+      "port": "",
+      "protocol": "mettler",
       "baud": 9600,
       "databits": 8,
       "parity": "N",
       "stopbits": 1,
+      "handshake": "xonxoff",
       "poll_interval": 0.5,
-      "autoconnect": false
+      "autoconnect": true
     },
     {
-      "name": "Simulator Timbangan",
+      "name": "Shinko GJ222",
+      "usb_serial": "FTB6SPL3A",
+      "port": "",
+      "protocol": "shinko",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "handshake": "none",
+      "poll_interval": 0.5,
+      "autoconnect": true
+    },
+    {
+      "name": "Simulator",
       "port": "SIM",
-      "protocol": "auto",
+      "protocol": "shinko",
       "baud": 9600,
       "databits": 8,
       "parity": "N",
       "stopbits": 1,
       "poll_interval": 0.5,
-      "autoconnect": false
+      "autoconnect": true
     }
   ]
 }

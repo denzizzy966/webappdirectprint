@@ -725,7 +725,7 @@ async function loadControlPorts() {
             fetch('/api/scales').then(r => r.json()).catch(() => ({ scales: [] }))
         ]);
         const ports = Array.isArray(resPorts) ? resPorts : (resPorts.ports || []);
-        const scales = resScales.scales || [];
+        const scales = Array.isArray(resScales) ? resScales : (resScales.scales || []);
         lastKnownScales = scales;
 
         const prevVal = currentSelectedScalePort || sel.value;
@@ -1244,7 +1244,7 @@ async function loadScales() {
         if (json.enable_scale_at_startup !== undefined) {
             updateScaleStartupUI(json.enable_scale_at_startup);
         }
-        const scales = json.scales || [];
+        const scales = Array.isArray(json) ? json : (json.scales || []);
         lastKnownScales = scales;
         if (scales.length > 0) {
             const active = getActiveConsoleScale(scales);

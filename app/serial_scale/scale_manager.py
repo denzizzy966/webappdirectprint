@@ -32,6 +32,7 @@ class ScaleInstance:
         self.parity = cfg.get("parity", "N")
         self.stopbits = int(cfg.get("stopbits", 1))
         self.poll_interval = float(cfg.get("poll_interval", 0.5))
+        self.handshake = (cfg.get("handshake") or "none").lower()
         self.autoconnect = cfg.get("autoconnect", True)
 
         self.ser: Optional[serial.Serial] = None
@@ -208,12 +209,17 @@ class ScaleInstance:
                 claimed = scale_manager.get_claimed_ports(exclude=self)
             self._auto_resolve_port(claimed_ports=claimed)
 
+            xonxoff = (self.handshake == "xonxoff")
+            rtscts = (self.handshake in ("rtscts", "hardware"))
+
             self.ser = serial.Serial(
                 port=self.port,
                 baudrate=self.baud,
                 bytesize=serial.SEVENBITS if self.databits == 7 else serial.EIGHTBITS,
                 parity=parity_map.get(self.parity, serial.PARITY_NONE),
                 stopbits=serial.STOPBITS_ONE if self.stopbits == 1 else serial.STOPBITS_TWO,
+                xonxoff=xonxoff,
+                rtscts=rtscts,
                 timeout=0.2,
                 write_timeout=0.5
             )
@@ -385,6 +391,7 @@ class ScaleInstance:
             "stable": self.stable,
             "timestamp": self.last_update_ts,
             "age": age,
+            "error": "" if self.connected else (self.status_detail or "Belum terhubung"),
             "ok": self.connected and (age < 10.0 if not self.sim else True)
         }
 

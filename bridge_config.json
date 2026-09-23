@@ -2,7 +2,7 @@
   "server": {
     "host": "0.0.0.0",
     "port": 18212,
-    "scale_port": null,
+    "scale_port": 17800,
     "cors_origins": [
       "*"
     ],
@@ -10,7 +10,7 @@
     "sharing_mode": "continuous",
     "idle_release_seconds": 4.0,
     "pause_auto_resume_seconds": 600,
-    "enable_scale_at_startup": false
+    "enable_scale_at_startup": true
   },
   "printers": {
     "default_raw_printer": "Godex G500 GZPL",
@@ -36,29 +36,33 @@
   },
   "scales": [
     {
-      "name": "Shinko 1",
-      "port": "/dev/ttyUSB0",
+      "name": "Mettler JE5002GE",
+      "usb_serial": "5",
+      "port": "",
+      "protocol": "mettler",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "handshake": "xonxoff",
+      "poll_interval": 0.5,
+      "autoconnect": true
+    },
+    {
+      "name": "Shinko GJ222",
+      "usb_serial": "FTB6SPL3A",
+      "port": "",
       "protocol": "shinko",
       "baud": 9600,
       "databits": 8,
       "parity": "N",
       "stopbits": 1,
+      "handshake": "none",
       "poll_interval": 0.5,
       "autoconnect": true
     },
     {
-      "name": "Shinko 2",
-      "port": "/dev/ttyUSB1",
-      "protocol": "shinko",
-      "baud": 9600,
-      "databits": 8,
-      "parity": "N",
-      "stopbits": 1,
-      "poll_interval": 0.5,
-      "autoconnect": true
-    },
-    {
-      "name": "Simulator Timbangan",
+      "name": "Simulator",
       "port": "SIM",
       "protocol": "shinko",
       "baud": 9600,
@@ -66,7 +70,7 @@
       "parity": "N",
       "stopbits": 1,
       "poll_interval": 0.5,
-      "autoconnect": false
+      "autoconnect": true
     }
   ]
 }
