@@ -312,7 +312,7 @@ async function bridgeAktif(timeoutMs = 1500) {
 }
 
 if (!await bridgeAktif()) {
-    alert('Hardware Bridge belum berjalan. Jalankan Run_HardwareBridge.bat terlebih dahulu.');
+    alert('Hardware Bridge belum berjalan. Jalankan INSTALL.bat (paket portable) terlebih dahulu.');
 }
 ```
 

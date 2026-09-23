@@ -71,25 +71,32 @@ Seluruh dokumentasi terkumpul di folder **[`docs/`](docs/)**.
 
 ## 🚀 Panduan Cepat Menjalankan (Quick Start)
 
-### A. Versi Windows 10 / 11
+### A. Versi Windows 10 / 11 — Paket Portable (Disarankan)
 
-1. **Jalankan Lewat Konsol:**
-   Klik ganda berkas:
-   ```cmd
-   windows\run.bat
-   ```
-2. **Jalankan di Background (Tanpa Jendela CMD Hitam):**
-   Klik ganda berkas:
-   ```cmd
-   windows\run_background.vbs
-   ```
-3. **Pasang Auto-Start (Otomatis Aktif saat Windows Dinyalakan):**
-   Klik kanan `windows\install_autostart.bat` -> **Run as administrator** (atau klik ganda).
-4. **Membangun File `.exe` Mandiri (Standalone Executable):**
-   Jalankan:
-   ```cmd
-   windows\build_exe.bat
-   ```
+Tidak butuh Python, tidak butuh internet. Padanan Windows dari `install.sh` di Linux.
+
+1. **Ekstrak** `HardwareBridge_Windows_x64_Portable.zip`
+   (klik kanan -> **Extract All…**, misal ke `C:\HardwareBridge`).
+   > ⚠️ Jangan klik `INSTALL.bat` dari *dalam* ZIP — ekstrak dulu.
+2. **Klik ganda `INSTALL.bat`.**
+   Installer memasang auto-start, menjalankan bridge di System Tray,
+   memverifikasi `/api/status`, lalu membuka dashboard sendiri.
+3. **Atur printer & timbangan** lewat dashboard di `http://127.0.0.1:18212`.
+
+Selesai — bridge menyala otomatis setiap kali Windows login.
+
+| Perlu… | Klik ganda |
+|---|---|
+| Cek bridge hidup atau tidak | `Cek_Status.bat` |
+| Lihat log real-time saat bermasalah | `Jalankan_Konsol.bat` |
+| Jalankan sekali tanpa auto-start | `Jalankan.bat` |
+| Diakses dari PC lain di jaringan | `Izinkan_Akses_LAN.bat` |
+| Copot auto-start | `UNINSTALL.bat` |
+
+**Menjalankan dari kode sumber** (untuk pengembangan): `windows\run.bat`
+**Membangun ulang paket portable**: `windows\build_portable.bat`
+
+*Detail lengkap: [docs/platform/windows.md](docs/platform/windows.md)*
 
 ---
 
@@ -120,7 +127,7 @@ Seluruh dokumentasi terkumpul di folder **[`docs/`](docs/)**.
 Integrasi ke ERPNext sangat mudah:
 1. Buka ERPNext -> Ketik **Client Script** di Awesome Bar -> Klik **New**.
 2. Pilih DocType target: `POS Invoice` atau `Sales Invoice`.
-3. Salin isi script dari berkas [`erpnext/erpnext_hardware_bridge.js`](file:///D:/Workspaces-gemini/webappdirectprint/erpnext/erpnext_hardware_bridge.js).
+3. Salin isi script dari berkas [`erpnext/erpnext_hardware_bridge.js`](erpnext/erpnext_hardware_bridge.js).
 4. Centang **Enabled** dan klik **Save**.
 5. Tombol **"Cetak Struk (Direct Print)"** dan **"Timbang Item Aktif"** akan langsung muncul di dokumen transaksi Anda!
 6. *Lihat panduan lengkap di [docs/integrasi/erpnext.md](docs/integrasi/erpnext.md).*

@@ -46,7 +46,7 @@ Panduan ini menjelaskan cara menghubungkan aplikasi web **ERPNext (v13, v14, ata
 - **DocType**: Pilih `POS Invoice` (atau `Sales Invoice` / `Delivery Note`).
 - **Apply To**: `Form`
 - **Enabled**: Centang (Aktifkan).
-- **Script**: Salin dan tempel kode dari berkas [`erpnext_hardware_bridge.js`](file:///D:/Workspaces-gemini/webappdirectprint/erpnext/erpnext_hardware_bridge.js).
+- **Script**: Salin dan tempel kode dari berkas [`erpnext_hardware_bridge.js`](../../erpnext/erpnext_hardware_bridge.js).
 - Klik **Save**.
 
 ### Langkah 3: Uji Coba di ERPNext

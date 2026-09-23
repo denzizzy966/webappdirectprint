@@ -276,7 +276,7 @@ async function bridgeAktif(timeoutMs = 1500) {
 document.addEventListener('DOMContentLoaded', async () => {
     if (!await bridgeAktif()) {
         HardwareBridge.toast(
-            '⚠️ Hardware Bridge belum berjalan di PC ini. Jalankan Run_HardwareBridge.bat.',
+            '⚠️ Hardware Bridge belum berjalan di PC ini. Jalankan INSTALL.bat dari paket portable.',
             '#b45309'
         );
     }

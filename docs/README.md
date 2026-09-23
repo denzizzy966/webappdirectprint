@@ -1,8 +1,11 @@
 # 📚 Dokumentasi WebApp Hardware Bridge Universal
 
 Seluruh dokumentasi proyek ini terkumpul di folder `docs/`. Berkas di luar folder
-ini hanya `README.md` (halaman muka repositori) dan `README.txt` (catatan singkat
-di dalam paket portable).
+ini hanya `README.md` (halaman muka repositori) dan `windows/portable/BACA_SAYA.txt`
+(catatan singkat yang ikut di dalam paket portable Windows).
+
+Folder `docs/` ini juga ikut dibundel ke dalam `HardwareBridge_Windows_x64_Portable.zip`,
+sehingga PC kasir tetap punya dokumentasi lengkap walau sedang offline.
 
 ---
 
@@ -14,7 +17,9 @@ di dalam paket portable).
 | "Kirim HTML yang dikonversi ke Base64 ke printer" | [direct-print/02-html-ke-base64.md](direct-print/02-html-ke-base64.md) |
 | "Cetak PDF dari `http://192.168.3.25/produksi/ProduksiPDF/...`" | [direct-print/03-pdf-dari-url.md](direct-print/03-pdf-dari-url.md) |
 | "PDF gagal dicetak di printer label Godex / Zebra" | [direct-print/08-printer-label-zpl.md](direct-print/08-printer-label-zpl.md) |
-| "Bagaimana cara memasang bridge di PC kasir?" | [03-instalasi.md](03-instalasi.md) |
+| "Bagaimana cara memasang bridge di PC kasir Windows?" | [platform/windows.md](platform/windows.md) |
+| "Bagaimana cara memasang bridge di PC kasir Linux?" | [platform/linux.md](platform/linux.md) |
+| "Panduan instalasi lengkap kedua platform" | [03-instalasi.md](03-instalasi.md) |
 | "Kenapa harus dipasang di PC klien, bukan di server?" | [01-arsitektur.md](01-arsitektur.md) |
 | "Saya mau membaca timbangan digital dari browser" | [06-timbangan-serial.md](06-timbangan-serial.md) |
 | "Cetak tidak jalan, harus cek apa?" | [08-troubleshooting.md](08-troubleshooting.md) |
@@ -61,8 +66,8 @@ di dalam paket portable).
 
 | Berkas | Isi |
 |--------|-----|
-| [platform/windows.md](platform/windows.md) | Berkas di folder `windows/`, auto-start, build `.exe` |
-| [platform/linux.md](platform/linux.md) | Berkas di folder `linux/`, systemd service, udev rules |
+| [platform/windows.md](platform/windows.md) | **Paket portable sekali klik**, auto-start, `Cek_Status.bat`, build ZIP |
+| [platform/linux.md](platform/linux.md) | `install.sh`, systemd service, udev rules |
 
 ---
 
@@ -92,8 +97,12 @@ webappdirectprint/
 ├── templates/index.html       Dashboard bridge
 ├── erpnext/                   Client Script siap pakai untuk ERPNext
 ├── laravel/                   Salinan SDK & demo untuk proyek Laravel
-├── windows/ , linux/          Skrip instalasi per platform
-└── docs/                      📚 Folder ini
+├── windows/
+│   ├── portable/              📦 Isi paket portable (INSTALL.bat dll) - sumber kebenaran
+│   ├── build_portable.bat     Bangun .exe + rakit ZIP portable siap bagi
+│   └── run.bat , ...          Menjalankan dari kode sumber (pengembangan)
+├── linux/                     install.sh, systemd service, udev rules, wheels offline
+└── docs/                      📚 Folder ini (ikut dibundel ke paket portable)
 ```
 
 ---

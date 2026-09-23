@@ -1,0 +1,118 @@
+================================================================================
+  WebApp Hardware Bridge Universal - Paket Portable Windows 10 / 11
+  Direct Print (Silent Print) + Pembaca Timbangan Digital Serial
+================================================================================
+
+  Paket ini sudah lengkap dan berdiri sendiri:
+    - 100% OFFLINE, tidak butuh koneksi internet.
+    - TIDAK perlu menginstal Python.
+    - Berjalan diam di System Tray, tanpa jendela hitam CMD.
+
+
+================================================================================
+  CARA PASANG - 3 LANGKAH
+================================================================================
+
+  LANGKAH 1. EKSTRAK DULU
+     Klik kanan HardwareBridge_Windows_x64_Portable.zip
+     -> "Extract All..." / "Ekstrak Semua"
+
+     PENTING: jangan klik INSTALL.bat dari dalam ZIP. Windows cuma
+     mengintip isi ZIP, berkas pendukungnya belum benar-benar ada.
+
+     Saran lokasi ekstrak:  C:\HardwareBridge
+
+
+  LANGKAH 2. KLIK 2x  INSTALL.bat
+     Installer otomatis mengerjakan semuanya:
+       - Membuat bridge_config.json bila belum ada
+       - Memasang auto-start saat Windows login
+       - Membuat shortcut dashboard di Desktop
+       - Menjalankan bridge di System Tray
+       - Memastikan service benar-benar menjawab
+       - Membuka dashboard di browser
+
+
+  LANGKAH 3. ATUR PRINTER DI DASHBOARD
+     Dashboard terbuka otomatis di http://127.0.0.1:18212
+       - Tab "Printer"    -> pilih printer default dan alias pool
+       - Tab "Timbangan"  -> pilih port COM timbangan
+       - Tab "Sandbox"    -> uji cetak struk / label / PDF
+
+  Selesai. Mulai sekarang bridge menyala sendiri setiap kali komputer
+  dinyalakan, tanpa perlu diklik lagi.
+
+
+================================================================================
+  ISI PAKET
+================================================================================
+
+  INSTALL.bat             Pasang sekali klik: auto-start + jalankan + verifikasi
+  UNINSTALL.bat           Copot auto-start dan hentikan service
+  Jalankan.bat            Jalankan sekali saja, tanpa memasang auto-start
+  Cek_Status.bat          Cek bridge hidup atau tidak + 20 baris log terakhir
+  Jalankan_Konsol.bat     Mode diagnosa, menampilkan log langsung real-time
+  Izinkan_Akses_LAN.bat   OPSIONAL, buka firewall agar bisa diakses PC lain
+  Jalankan_Diam.vbs       Penolong runner senyap (dipakai otomatis)
+
+  HardwareBridge.exe      Aplikasi utama
+  _internal\              Pustaka pendukung aplikasi, JANGAN dihapus
+  bridge_config.json      Setelan printer, timbangan, dan port
+  logs\                   Berkas log aktivitas
+  docs\                   Dokumentasi lengkap
+
+
+================================================================================
+  PEMAKAIAN SEHARI-HARI
+================================================================================
+
+  Buka dashboard      : klik shortcut "Hardware Bridge Dashboard" di Desktop
+                        atau ketik http://127.0.0.1:18212 di browser
+  Cek kondisi bridge  : klik 2x Cek_Status.bat
+  Hentikan sementara  : klik kanan ikon System Tray -> "Hentikan Service"
+  Jalankan lagi       : klik 2x Jalankan.bat
+  Restart bridge      : klik kanan ikon System Tray -> "Restart Service"
+
+
+================================================================================
+  KALAU ADA MASALAH
+================================================================================
+
+  "HardwareBridge.exe tidak ditemukan"
+     ZIP belum diekstrak. Ulangi Langkah 1.
+
+  Ikon System Tray tidak muncul / bridge tidak hidup
+     1. Klik 2x Jalankan_Konsol.bat, baca pesan galat di layar.
+     2. Kemungkinan besar diblokir Windows Defender. Buka
+        Windows Security -> Virus & threat protection -> Manage settings
+        -> Exclusions -> Add folder -> pilih folder Hardware Bridge ini.
+
+  Dashboard tidak bisa dibuka di port 18212
+     Bridge otomatis pindah ke port cadangan bila 18212 dipakai aplikasi lain.
+     Coba http://127.0.0.1:12212 , atau jalankan Cek_Status.bat yang
+     otomatis memeriksa kedua port.
+
+  Timbangan "Access is denied" / port COM dipakai program lain
+     Tekan tombol "Lepas Port (Delphi)" di dashboard, atau ubah
+     "sharing_mode" di bridge_config.json menjadi "on_demand".
+
+  Kabel USB timbangan dipindah ke lubang USB lain
+     Tidak masalah. Isi "usb_serial" pada bridge_config.json dengan serial
+     number adapter USB, bridge akan melacaknya otomatis ke port COM mana pun.
+
+  Printer tidak muncul di daftar
+     Pastikan printer sudah bisa Test Page dari Windows
+     (Settings -> Bluetooth & devices -> Printers & scanners).
+
+
+================================================================================
+  DOKUMENTASI LENGKAP
+================================================================================
+
+  Di dalam paket ini      : folder docs\
+  Panduan Windows         : docs\platform\windows.md
+  Demo interaktif         : http://127.0.0.1:18212/static/cara-pakai.html
+  Referensi API otomatis  : http://127.0.0.1:18212/docs
+  SDK JavaScript          : http://127.0.0.1:18212/api/download/hardware-bridge.js
+
+================================================================================

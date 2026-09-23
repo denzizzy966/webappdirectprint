@@ -103,10 +103,13 @@ Diagnosis lengkap, protokol, dan console interaktif:
 
 | Gejala | Solusi |
 |--------|--------|
-| Tidak jalan setelah reboot | Jalankan ulang `Install_AutoStart.bat` **sebagai Administrator** |
-| Jalan tapi jendela konsol mengganggu | Pakai `windows/run_background.vbs` (mode silent + tray) |
-| Ingin memeriksa entri startup | `shell:startup` di Run, atau Task Scheduler |
-| Ingin mencopot | `Uninstall_AutoStart.bat` |
+| Ingin tahu kondisi bridge saat ini | Klik ganda `Cek_Status.bat` — menampilkan proses, status auto-start, port aktif, dan 20 baris log terakhir |
+| Tidak jalan setelah reboot | Jalankan ulang `INSTALL.bat` (tidak perlu Administrator) |
+| `INSTALL.bat` bilang `HardwareBridge.exe TIDAK DITEMUKAN` | ZIP belum diekstrak. Klik kanan ZIP → **Extract All…**, lalu jalankan dari folder hasil ekstrak |
+| Terpasang tapi tetap tidak hidup | Klik ganda `Jalankan_Konsol.bat` untuk melihat log real-time; paling sering diblokir Windows Defender (tambahkan foldernya ke **Exclusions**) |
+| Ingin memeriksa entri startup | Ketik `shell:startup` di Run — cari `HardwareBridge.lnk` |
+| Ingin mencopot | `UNINSTALL.bat` |
+| Menjalankan dari kode sumber, bukan paket portable | `windows\install_autostart.bat` / `windows\uninstall_autostart.bat` |
 
 ### Linux
 

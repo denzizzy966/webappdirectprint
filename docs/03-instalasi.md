@@ -9,11 +9,10 @@ Dokumen ini berisi panduan langkah demi langkah cara memasang (*install*), mengo
 1. [Arsitektur & Mengapa Harus di Client PC](#-arsitektur--mengapa-harus-di-client-pc)
 2. [Persyaratan Sistem (Prerequisites)](#-persyaratan-sistem-prerequisites)
 3. [Panduan Instalasi Windows 10 / 11](#-panduan-instalasi-windows-10--11)
-   - [Metode 1: Menjalankan Langsung di Konsol (`run.bat`)](#metode-1-menjalankan-langsung-di-konsol-runbat)
-   - [Metode 2: Menjalankan Latar Belakang / Silent Tray (`run_background.vbs`)](#metode-2-menjalankan-latar-belakang--silent-tray-run_backgroundvbs)
-   - [Metode 3: Memasang Auto-Start Windows Booting (`install_autostart.bat`)](#metode-3-memasang-auto-start-windows-booting-install_autostartbat)
-   - [Metode 4: Membangun Binary Standalone `.exe` (`build_exe.bat`)](#metode-4-membangun-binary-standalone-exe-build_exebat)
-   - [Mencopot Auto-Start Windows (`uninstall_autostart.bat`)](#mencopot-auto-start-windows-uninstall_autostartbat)
+   - [Cara A — Paket Portable, sekali klik (Disarankan)](#cara-a--paket-portable-sekali-klik-disarankan)
+   - [Cara B — Jalankan dari Kode Sumber](#cara-b--jalankan-dari-kode-sumber)
+   - [Membangun Paket Portable Sendiri (`build_portable.bat`)](#membangun-paket-portable-sendiri-build_portablebat)
+   - [Mencopot Hardware Bridge di Windows](#mencopot-hardware-bridge-di-windows)
    - [Troubleshooting & Solusi Masalah Windows](#troubleshooting--solusi-masalah-windows)
 4. [Panduan Instalasi Linux Mint 22 / Ubuntu 22](#-panduan-instalasi-linux-mint-22--ubuntu-22)
    - [Metode 1: Pemasangan Otomatis Systemd Service (`install.sh`)](#metode-1-pemasangan-otomatis-systemd-service-installsh)
@@ -41,8 +40,10 @@ Dokumen ini berisi panduan langkah demi langkah cara memasang (*install*), mengo
 ## 📋 Persyaratan Sistem (Prerequisites)
 
 ### 🪟 Windows 10 / 11:
-1. **Python 3.10 atau lebih baru** (disarankan 3.10 / 3.11 / 3.12).
-   * Pastikan saat instalasi Python mencentang opsi: **"Add Python to PATH"**.
+1. **Python 3.10+ — HANYA bila Anda menjalankan dari kode sumber.**
+   * Pastikan opsi **"Add Python to PATH"** dicentang saat instalasi Python.
+   * **Pengguna paket portable tidak perlu Python sama sekali.** Python, seluruh
+     pustaka, dashboard, dan dokumentasi sudah ikut di dalam ZIP.
 2. **Driver USB Serial Converter:**
    * Prolific PL2303 / PL2303GS (bawaan Windows Update atau driver resmi Prolific).
    * CH340 / CH341 (untuk timbangan murah / adapter biru CH340).
@@ -59,108 +60,212 @@ Dokumen ini berisi panduan langkah demi langkah cara memasang (*install*), mengo
 
 ## 🪟 Panduan Instalasi Windows 10 / 11
 
-Seluruh script automasi untuk Windows terletak di folder [`windows/`](file:///D:/Workspaces-gemini/webappdirectprint/windows).
+Ada dua jalur. **Untuk PC kasir / produksi, pakai Cara A.**
+
+| Kebutuhan | Jalur |
+|---|---|
+| Memasang di PC kasir / produksi | **Cara A — Paket Portable** (tanpa Python, tanpa internet) |
+| Mengembangkan / mengubah kode Python | Cara B — Jalankan dari kode sumber |
+
+---
+
+### Cara A — Paket Portable, sekali klik (Disarankan)
+
+Ini padanan Windows dari `sudo bash linux/install.sh`. Satu berkas ZIP, satu
+klik, semuanya beres: auto-start terpasang, service jalan, dashboard terbuka.
+
+#### Langkah 1 — Ekstrak ZIP
+
+Klik kanan `HardwareBridge_Windows_x64_Portable.zip` → **Extract All… / Ekstrak Semua**.
+
+> ⚠️ **Jangan klik `INSTALL.bat` langsung dari dalam ZIP.** Windows hanya
+> *mengintip* isi ZIP; berkas pendukung belum benar-benar ada di disk sehingga
+> installer pasti gagal. Installer mendeteksi kesalahan ini dan memberi tahu Anda,
+> tetapi lebih baik diekstrak dari awal.
+
+Saran lokasi: `C:\HardwareBridge`
+
+#### Langkah 2 — Klik ganda `INSTALL.bat`
+
+Tidak perlu hak Administrator. Installer berjalan enam tahap:
+
+| Tahap | Yang dikerjakan |
+|---|---|
+| **1/6** | Memastikan `HardwareBridge.exe` ada; mendeteksi ZIP yang belum diekstrak dan mode kode sumber |
+| **2/6** | Membuat `bridge_config.json` bawaan Windows bila belum ada, membuat folder `logs\`, membaca nomor port dari konfigurasi |
+| **3/6** | Menghentikan instance lama (`taskkill`) supaya port tidak bentrok dengan diri sendiri |
+| **4/6** | Memasang shortcut auto-start di folder Startup Windows + shortcut dashboard di Desktop |
+| **5/6** | Menjalankan bridge di System Tray |
+| **6/6** | **Memverifikasi** `/api/status` benar-benar menjawab, memeriksa port utama maupun port cadangan `12212` |
+
+Bila sukses, muncul ringkasan seperti ini lalu dashboard terbuka sendiri:
 
 ```
-webappdirectprint/
-└── windows/
-    ├── run.bat                 <-- Menjalankan langsung di jendela CMD
-    ├── run_background.vbs      <-- Menjalankan di background (tanpa jendela CMD)
-    ├── install_autostart.bat   <-- Memasang auto-start saat Windows booting/login
-    ├── uninstall_autostart.bat <-- Mencopot shortcut auto-start
-    └── build_exe.bat           <-- Mengompilasi menjadi berkas .exe mandiri
+==========================================================
+  PEMASANGAN SELESAI - HARDWARE BRIDGE SUDAH BERJALAN
+==========================================================
+  Status      : Aktif / Online
+  System Tray : Ikon hijau di pojok kanan bawah dekat jam
+  Dashboard   : http://127.0.0.1:18212
+  WebSocket   : ws://127.0.0.1:18212/ws
+  Auto-start  : AKTIF, otomatis nyala tiap login Windows
+  Berkas log  : C:\HardwareBridge\logs\hardware_bridge.log
+==========================================================
 ```
 
-### Metode 1: Menjalankan Langsung di Konsol (`run.bat`)
-Sangat cocok untuk pengujian awal atau *debugging* karena log aktivitas langsung terlihat di layar.
+Bila gagal, installer menyebutkan penyebab yang paling mungkin (antivirus, port
+bentrok, izin tulis) lengkap dengan langkah perbaikannya.
 
-1. Buka folder `windows/`.
-2. Klik ganda berkas **`run.bat`**.
-3. Script akan otomatis:
-   * Memeriksa apakah Python terpasang di sistem.
-   * Mengunduh dependensi (`pip install -r requirements.txt`).
-   * Menjalankan server bridge di port `18212` (atau fallback ke `12212`).
-4. Buka peramban (*browser*) Anda dan akses:
-   👉 **`http://127.0.0.1:18212`**
-5. Tekan `Ctrl + C` di jendela konsol jika ingin menghentikan service.
+#### Langkah 3 — Atur printer & timbangan
 
----
+Dashboard sudah terbuka di `http://127.0.0.1:18212`. Atur printer default, alias
+pool, dan port COM timbangan lewat antarmuka web — tidak perlu menyunting JSON
+secara manual.
 
-### Metode 2: Menjalankan Latar Belakang / Silent Tray (`run_background.vbs`)
-Sangat cocok untuk kasir sehari-hari agar tidak ada jendela hitam CMD yang mengganggu atau tidak sengaja tertutup oleh kasir.
+#### Isi paket portable
 
-1. Buka folder `windows/`.
-2. Klik ganda berkas **`run_background.vbs`**.
-3. Aplikasi akan berjalan di latar belakang (*background process*). Ikon Hardware Bridge akan muncul di **System Tray** pojok kanan bawah Windows (dekat jam).
-4. Klik kanan pada ikon system tray untuk:
-   * **Open Dashboard:** Membuka dashboard web di browser.
-   * **Exit Bridge:** Menutup service bridge secara aman.
+| Berkas | Fungsi |
+|---|---|
+| **`INSTALL.bat`** | **Pasang sekali klik**: auto-start + jalankan + verifikasi |
+| `UNINSTALL.bat` | Copot auto-start, hentikan service, hapus aturan firewall |
+| `Jalankan.bat` | Jalankan sekali saja tanpa memasang auto-start |
+| `Cek_Status.bat` | Cek hidup/tidak, port aktif, ringkasan `/api/status`, 20 baris log terakhir |
+| `Jalankan_Konsol.bat` | Mode diagnosa: restart bridge lalu tampilkan log real-time |
+| `Izinkan_Akses_LAN.bat` | **Opsional**, buka Windows Firewall agar bisa diakses PC lain |
+| `Jalankan_Diam.vbs` | Penolong runner senyap (dipakai otomatis) |
+| `bridge_config.json` | Setelan printer, timbangan, port |
+| `BACA_SAYA.txt` | Panduan singkat di dalam paket |
+| `HardwareBridge.exe` + `_internal\` | Aplikasi & pustakanya — jangan dipisahkan |
+| `docs\`, `sdk\` | Dokumentasi lengkap & SDK JavaScript, tersedia offline |
 
----
+#### Pengelolaan sehari-hari (padanan systemd)
 
-### Metode 3: Memasang Auto-Start Windows Booting (`install_autostart.bat`)
-Gunakan metode ini agar setiap kali komputer kasir dinyalakan / login ke Windows, Hardware Bridge otomatis aktif di latar belakang.
+| Linux | Windows (paket portable) |
+|---|---|
+| `sudo bash linux/install.sh` | klik ganda `INSTALL.bat` |
+| `sudo bash linux/uninstall.sh` | klik ganda `UNINSTALL.bat` |
+| `sudo systemctl status hardware-bridge` | klik ganda `Cek_Status.bat` |
+| `sudo systemctl restart hardware-bridge` | klik kanan ikon tray → **Restart Service** |
+| `sudo systemctl stop hardware-bridge` | klik kanan ikon tray → **Hentikan Service** |
+| `journalctl -u hardware-bridge -f` | klik ganda `Jalankan_Konsol.bat` |
+| `bash linux/run.sh` | klik ganda `Jalankan.bat` |
 
-1. Buka folder `windows/`.
-2. Klik kanan pada berkas **`install_autostart.bat`** -> Pilih **"Run as administrator"** (atau cukup klik ganda).
-3. Script akan membuat shortcut resmi di folder Startup Windows:
-   `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\HardwareBridge.lnk`
-4. Akan muncul pesan sukses:
-   ```
-   ===================================================
-    Memasang Auto-Start Hardware Bridge saat Login
-   ===================================================
-   [SUKSES] Auto-Start berhasil dipasang!
-   Hardware Bridge akan otomatis aktif setiap kali Anda menyalakan komputer.
-   ```
-5. Selesai! Mulai sekarang, kasir tidak perlu menjalankan script manual apa pun saat komputer dinyalakan.
+#### Akses dari komputer lain (opsional)
 
----
+Bila aplikasi web dibuka dari PC lain dalam satu jaringan, jalankan
+`Izinkan_Akses_LAN.bat`. Skrip meminta hak Administrator lewat UAC, membuka port
+di Windows Firewall **hanya untuk profil Private dan Domain** (profil Public
+sengaja tidak dibuka), lalu menampilkan alamat IP komputer tersebut.
 
-### Metode 4: Membangun Binary Standalone `.exe` (`build_exe.bat`)
-Jika Anda ingin mendistribusikan aplikasi ini ke PC kasir lain tanpa harus menginstal Python di komputer target:
-
-1. Pastikan koneksi internet aktif.
-2. Buka folder `windows/` dan klik ganda **`build_exe.bat`**.
-3. Script akan otomatis menginstal `PyInstaller` dan memaketkan seluruh aplikasi, template web, aset static, dan dependensi menjadi folder binary mandiri.
-4. Hasil kompilasi akan berada di:
-   📂 **`dist\HardwareBridge\HardwareBridge.exe`**
-5. Anda cukup menyalin (*copy*) seluruh folder `dist\HardwareBridge` ke komputer kasir mana pun dan membuat shortcut ke `HardwareBridge.exe`.
+Pastikan juga `"host"` pada `bridge_config.json` bernilai `"0.0.0.0"`.
 
 ---
 
-### Mencopot Auto-Start Windows (`uninstall_autostart.bat`)
-Jika ingin menonaktifkan auto-start:
-1. Buka folder `windows/`.
-2. Klik ganda **`uninstall_autostart.bat`**.
-3. Shortcut di folder Startup Windows akan dihapus secara bersih.
+### Cara B — Jalankan dari Kode Sumber
+
+Untuk pengembangan, atau bila Anda ingin mengubah kode Python.
+
+| Berkas di `windows/` | Fungsi |
+|---|---|
+| `run.bat` | Pasang dependensi lalu jalankan di jendela CMD (log terlihat langsung) |
+| `run_background.vbs` | Jalankan di latar belakang dengan ikon tray, tanpa jendela CMD |
+| `install_autostart.bat` | Pasang auto-start yang menunjuk ke `run_background.vbs` |
+| `uninstall_autostart.bat` | Copot auto-start tersebut |
+| `build_portable.bat` | Bangun `.exe` + rakit ZIP portable siap bagi |
+
+```cmd
+windows\run.bat
+```
+
+Skrip memeriksa Python, memasang `requirements.txt`, lalu menjalankan bridge di
+port `18212`. Tekan `Ctrl + C` untuk berhenti.
+
+---
+
+### Membangun Paket Portable Sendiri (`build_portable.bat`)
+
+Untuk mendistribusikan ke PC kasir lain tanpa menginstal Python di sana:
+
+```cmd
+windows\build_portable.bat
+```
+
+Skrip ini mengerjakan empat tahap:
+
+1. Mengompilasi `HardwareBridge.exe` dengan PyInstaller (memasang PyInstaller
+   otomatis bila belum ada).
+2. Merakit isi paket: binary + seluruh isi `windows\portable\` + `docs\` + SDK.
+3. Memampatkan menjadi `HardwareBridge_Windows_x64_Portable.zip` di root proyek.
+4. Menampilkan ringkasan ukuran dan isi paket.
+
+> **Ingin mengubah isi paket portable?** Sunting berkas di `windows\portable\`
+> (teks installer, konfigurasi bawaan, `BACA_SAYA.txt`), lalu jalankan ulang
+> `build_portable.bat`. Folder itu satu-satunya sumber kebenaran isi paket —
+> tidak ada salinan lain yang perlu disamakan manual.
+
+---
+
+### Mencopot Hardware Bridge di Windows
+
+**Paket portable:** klik ganda `UNINSTALL.bat`. Skrip menghentikan service,
+menghapus shortcut auto-start dan shortcut Desktop, serta menghapus aturan
+firewall bila pernah dipasang.
+
+`bridge_config.json` dan folder `logs\` **sengaja tidak dihapus** agar setelan
+printer dan timbangan Anda tidak hilang. Ingin membuang total? Hapus saja
+foldernya.
+
+**Mode kode sumber:** klik ganda `windows\uninstall_autostart.bat`.
 
 ---
 
 ### Troubleshooting & Solusi Masalah Windows
 
-#### 1. Port Serial Timbangan `Access is denied` (Error 13):
-* **Penyebab:** Port COM sedang dibuka secara eksklusif oleh aplikasi lain (misal program kasir Delphi lawas, HyperTerminal, atau tab browser lain).
+#### 1. `[ERROR] HardwareBridge.exe TIDAK DITEMUKAN` saat menjalankan `INSTALL.bat`:
+* **Penyebab:** `INSTALL.bat` diklik langsung dari dalam berkas ZIP.
+* **Solusi:** Klik kanan ZIP → **Extract All…**, buka folder hasil ekstrak, baru
+  jalankan `INSTALL.bat` dari sana.
+
+#### 2. Ikon System Tray tidak muncul / bridge tidak mau hidup:
+* Klik ganda **`Jalankan_Konsol.bat`** untuk melihat log real-time.
+* Penyebab tersering adalah Windows Defender memblokir `HardwareBridge.exe`.
+  Buka **Windows Security → Virus & threat protection → Manage settings →
+  Exclusions → Add folder**, lalu pilih folder Hardware Bridge.
+
+#### 3. Dashboard tidak bisa dibuka di port `18212`:
+* Bridge otomatis pindah ke port cadangan `12212` bila `18212` sedang dipakai
+  aplikasi lain (misal service Java bridge lawas). Lihat baris `[Port]` di log.
+* `Cek_Status.bat` memeriksa kedua port sekaligus dan menyebutkan mana yang aktif.
+
+#### 4. Port Serial Timbangan `Access is denied` (Error 13):
+* **Penyebab:** Port COM sedang dibuka secara eksklusif oleh aplikasi lain (misal
+  program kasir Delphi lawas, HyperTerminal, atau tab browser lain).
 * **Solusi:**
   - Tekan tombol **`⏸️ Lepas Port (Delphi)`** di dashboard bridge.
-  - Atau ubah mode port di `bridge_config.json` menjadi `"sharing_mode": "on_demand"`. Pada mode ini, port COM akan otomatis dilepas jika tidak ada transaksi timbangan dalam 4 detik.
+  - Atau ubah `"sharing_mode"` di `bridge_config.json` menjadi `"on_demand"`.
+    Pada mode ini port COM otomatis dilepas bila tidak ada transaksi timbangan
+    selama `idle_release_seconds` (bawaan 4 detik).
 
-#### 2. Kabel USB Timbangan Dicabut & Dicolokkan ke Lubang USB Lain:
-* **Fitur Auto-Resolve:** Hardware Bridge sudah dilengkapi pelacak otomatis USB Serial Number (`BMCBE14A312`). Jika port berpindah dari `COM5` ke `COM1`, bridge akan otomatis mendeteksi dan berpindah port tanpa perlu ubah konfigurasi manual.
-* Jika timbangan tidak bergerak, klik tombol **`▶️ Sambungkan`** atau **`0️⃣ ZERO`** pada dashboard.
+#### 5. Kabel USB timbangan dicabut & dicolokkan ke lubang USB lain:
+* **Fitur Auto-Resolve:** isi `"usb_serial"` pada `bridge_config.json` dengan
+  serial number adapter USB Anda (misal `BMCBE14A312`). Bila port berpindah dari
+  `COM5` ke `COM1`, bridge otomatis mendeteksi dan mengikuti tanpa ubah konfigurasi.
+* Bila timbangan tidak bergerak, klik **`▶️ Sambungkan`** atau **`0️⃣ ZERO`** di dashboard.
 
-#### 3. Driver Prolific PL2303 Menampilkan Tanda Seru Kuning (Code 10) di Device Manager:
-* **Penyebab:** Versi chip PL2303 clone/lawas tidak didukung driver Windows 11 terbaru.
-* **Solusi:** Pasang driver Prolific versi 3.3.2 (2008) atau gunakan kabel USB Serial chipset FTDI / CH340.
+#### 6. Driver Prolific PL2303 menampilkan tanda seru kuning (Code 10):
+* **Penyebab:** Chip PL2303 clone/lawas tidak didukung driver Windows 11 terbaru.
+* **Solusi:** Pasang driver Prolific versi 3.3.2 (2008), atau ganti ke kabel USB
+  Serial chipset FTDI / CH340.
 
-#### 4. Notifikasi Windows Defender / Antivirus:
-* Tambahkan folder `webappdirectprint` ke dalam daftar pengecualian (*Exclusions*) di Windows Security.
+#### 7. Aplikasi web di komputer lain tidak bisa memanggil bridge:
+* Jalankan **`Izinkan_Akses_LAN.bat`** (klik "Yes" pada dialog UAC).
+* Pastikan `"host"` pada `bridge_config.json` bernilai `"0.0.0.0"`, bukan `"127.0.0.1"`.
 
 ---
 
 ## 🐧 Panduan Instalasi Linux Mint 22 / Ubuntu 22
 
-Seluruh script automasi untuk Linux terletak di folder [`linux/`](file:///D:/Workspaces-gemini/webappdirectprint/linux).
+Seluruh script automasi untuk Linux terletak di folder [`linux/`](../linux/).
 
 ```
 webappdirectprint/
@@ -282,22 +387,42 @@ sudo bash linux/uninstall.sh
 
 ## ⚙️ Konfigurasi Port & Hardware (`bridge_config.json`)
 
-File konfigurasi berada di root proyek: [`bridge_config.json`](file:///D:/Workspaces-gemini/webappdirectprint/bridge_config.json).
+Lokasi berkas:
+
+| Cara pakai | Lokasi `bridge_config.json` |
+|---|---|
+| Paket portable Windows | di samping `HardwareBridge.exe`, folder hasil ekstrak |
+| Kode sumber (Windows/Linux) | root proyek: [`bridge_config.json`](../bridge_config.json) |
+
+> Sebagian besar parameter bisa diubah lewat **Dashboard → Pengaturan** tanpa
+> menyunting JSON. Sunting manual hanya bila Anda butuh opsi lanjutan.
 
 ```json
 {
   "server": {
-    "host": "127.0.0.1",
+    "host": "0.0.0.0",
     "port": 18212,
+    "scale_port": null,
+    "cors_origins": ["*"],
+    "enable_tray": true,
     "sharing_mode": "continuous",
     "idle_release_seconds": 4.0,
-    "enable_scale_at_startup": true,
-    "cors_origins": ["*"]
+    "pause_auto_resume_seconds": 600,
+    "enable_scale_at_startup": false
   },
   "printers": {
-    "default_printer": "",
-    "auto_cut": true,
-    "open_cashdrawer": false
+    "default_raw_printer": "EPSON TM-T82",
+    "default_doc_printer": "Microsoft Print to PDF",
+    "default_encoding": "cp437",
+    "pools": {
+      "receipt": "EPSON TM-T82",
+      "label": "Godex G500 GZPL",
+      "asset_label": "Godex G500 GZPL",
+      "invoice": "Microsoft Print to PDF"
+    },
+    "network_printers": [
+      { "name": "Printer Dapur", "ip": "192.168.1.200", "port": 9100, "type": "escpos" }
+    ]
   },
   "scales": [
     {
@@ -322,19 +447,29 @@ File konfigurasi berada di root proyek: [`bridge_config.json`](file:///D:/Worksp
 ```
 
 ### Penjelasan Parameter Kunci:
-1. **`server.port`:**
-   * Default: `18212` (atau fallback otomatis ke `12212` jika kosong).
+1. **`server.host`:**
+   * `"0.0.0.0"` (bawaan): bridge bisa dipanggil dari PC lain di jaringan — di
+     Windows tetap perlu menjalankan `Izinkan_Akses_LAN.bat` agar firewall membuka portnya.
+   * `"127.0.0.1"`: bridge hanya bisa dipanggil dari PC itu sendiri (paling aman).
+2. **`server.port`:**
+   * Default: `18212`, dengan fallback otomatis ke `12212` bila port itu sedang dipakai.
    * Menghindari tabrakan port dengan service imTigger Java bridge lawas.
-2. **`server.sharing_mode`:**
+3. **`server.sharing_mode`:**
    * `"continuous"`: Timbangan di-stream secara cepat dan terus menerus. Terdapat tombol *Pause* dan *Resume* di dashboard.
    * `"on_demand"`: Port serial hanya dibuka saat ada panggilan API membaca timbangan, lalu otomatis dilepas setelah `idle_release_seconds` (misal 4 detik) agar software Delphi kasir bisa mengakses port COM tanpa bentrok.
-3. **`server.enable_scale_at_startup`:**
+4. **`server.enable_scale_at_startup`:**
    * `true` (Default): Port timbangan otomatis dibuka dan disambungkan saat service bridge dinyalakan.
    * `false`: Bridge **tidak membuka atau mengunci port COM** saat startup. Sangat berguna untuk komputer atau aplikasi yang masih menghubungkan timbangan langsung via JavaScript peramban (**Web Serial API di Chrome / Edge**), sehingga port serial tetap bebas dan tidak bentrok (*Access is denied*). Pengaturan ini juga dapat diaktifkan/dinonaktifkan langsung lewat 1 klik di Dashboard Timbangan / Pengaturan.
-4. **`scales[].usb_serial`:**
+5. **`scales[].usb_serial`:**
    * Masukkan Serial Number adapter USB Anda (misal `BMCBE14A312`). Sistem akan **otomatis melacak colokan USB mana pun yang digunakan**, sehingga meskipun kabel dicolokkan ke port USB lain, bridge tetap otomatis terhubung!
-5. **`scales[].protocol`:**
+6. **`scales[].protocol`:**
    * Pilihan: `"auto"`, `"shinko"`, `"mettler"`, `"and"`. Disarankan `"auto"` untuk auto-detect format stream data.
+7. **`printers.pools`:**
+   * Alias printer, misal `receipt`, `label`, `asset_label`, `invoice`.
+   * Aplikasi web cukup menyebut aliasnya; tiap PC memetakan alias itu ke nama
+     printer fisiknya sendiri. Kode aplikasi jadi tidak terikat nama printer per PC.
+8. **`printers.network_printers`:**
+   * Printer LAN/Wi-Fi yang dipanggil langsung lewat TCP port `9100`, tanpa driver Windows/CUPS.
 
 ---
 

@@ -1,0 +1,55 @@
+{
+  "server": {
+    "host": "0.0.0.0",
+    "port": 18212,
+    "scale_port": null,
+    "cors_origins": [
+      "*"
+    ],
+    "enable_tray": true,
+    "sharing_mode": "continuous",
+    "idle_release_seconds": 4.0,
+    "pause_auto_resume_seconds": 600,
+    "enable_scale_at_startup": false
+  },
+  "printers": {
+    "default_raw_printer": "",
+    "default_doc_printer": "",
+    "default_encoding": "cp437",
+    "pools": {
+      "receipt": "",
+      "label": "",
+      "asset_label": "",
+      "barcode": "",
+      "invoice": "",
+      "kitchen": "",
+      "packing_slip": ""
+    },
+    "network_printers": []
+  },
+  "scales": [
+    {
+      "name": "Timbangan Kasir 1",
+      "port": "COM1",
+      "usb_serial": "",
+      "protocol": "auto",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "poll_interval": 0.5,
+      "autoconnect": false
+    },
+    {
+      "name": "Simulator Timbangan",
+      "port": "SIM",
+      "protocol": "auto",
+      "baud": 9600,
+      "databits": 8,
+      "parity": "N",
+      "stopbits": 1,
+      "poll_interval": 0.5,
+      "autoconnect": false
+    }
+  ]
+}

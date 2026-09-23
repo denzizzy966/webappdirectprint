@@ -7,13 +7,17 @@ adalah jalur tercepat sampai kertas keluar dari printer.
 
 ## Langkah 1 — Jalankan Bridge
 
-### Windows (paket portable)
+### Windows (paket portable) — cara termudah
 
 ```
-1. Ekstrak HardwareBridge_Windows_x64_Portable.zip
-2. Klik ganda Run_HardwareBridge.bat
-3. Ikon ⚡ hijau muncul di system tray (pojok kanan bawah)
+1. Klik kanan HardwareBridge_Windows_x64_Portable.zip -> Extract All...
+   (jangan klik INSTALL.bat dari dalam ZIP)
+2. Klik ganda INSTALL.bat
+3. Ikon ⚡ hijau muncul di system tray, dashboard terbuka sendiri
 ```
+
+`INSTALL.bat` sekalian memasang auto-start, jadi bridge menyala otomatis tiap
+Windows login. Mau jalan sekali saja tanpa auto-start? Pakai `Jalankan.bat`.
 
 ### Windows (dari kode sumber)
 

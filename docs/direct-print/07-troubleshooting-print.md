@@ -7,7 +7,7 @@
 Kerjakan dari atas; sebagian besar masalah selesai di tiga langkah pertama.
 
 1. **Bridge hidup?** Buka `http://127.0.0.1:18212` di PC operator. Dashboard harus
-   tampil. Bila tidak, jalankan `Run_HardwareBridge.bat` atau periksa ikon tray.
+   tampil. Bila tidak, jalankan `INSTALL.bat` (paket portable Windows) atau periksa ikon tray.
 2. **Printer terdeteksi?** `http://127.0.0.1:18212/api/printers` harus memuat nama
    printer Anda.
 3. **Printer merespons?** Dashboard → Sandbox → **Cetak Struk Contoh** atau
